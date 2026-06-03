@@ -135,8 +135,8 @@ table.rt tr:last-child td{border-bottom:none;}
   </div>
   <div class="mode-bar">
     <button class="mode-btn active-comb" id="btn-comb" onclick="setNivel('combinado')">🔀 Combinado</button>
-    <button class="mode-btn" id="btn-prim" onclick="setNivel('primaria')">📘 Primaria</button>
-    <button class="mode-btn" id="btn-jard" onclick="setNivel('jardin')">🌱 Jardín</button>
+    <button class="mode-btn" id="btn-prim" onclick="setNivel('primaria')">📚 Primaria</button>
+    <button class="mode-btn" id="btn-jard" onclick="setNivel('jardin')">🎨 Jardín</button>
   </div>
   <button class="report-btn" onclick="generarInforme()" title="Generar informe imprimible con los filtros activos">📄 Informe</button>
 </header>
@@ -565,7 +565,7 @@ function setNivel(n){
   document.getElementById('btn-prim').className='mode-btn'+(n==='primaria'?' active-prim':'');
   document.getElementById('btn-jard').className='mode-btn'+(n==='jardin'?' active-jard':'');
   document.getElementById('mapTitle').textContent=
-    n==='combinado'?'🗺 Mapa Combinado':n==='primaria'?'📘 Primaria':' 🌱 Jardín';
+    n==='combinado'?'🗺 Mapa Combinado':n==='primaria'?'📚 Primaria':' 🎨 Jardín';
   buildFilters();
   update();
 }
