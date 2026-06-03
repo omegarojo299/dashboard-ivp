@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Área de Ubicación de Estudiantes IVP</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+:root{--bg:#0d0f14;--s1:#151820;--s2:#1c2030;--br:#252a3a;--ac:#4f8eff;--ac2:#ff6b35;--ac3:#00d4aa;--ac4:#a78bfa;--tx:#e8eaf0;--mt:#7a8299;--r:12px;
+  --prim:#4f8eff;--jard:#00d4aa;--comb:#a78bfa;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:'DM Sans',sans-serif;min-height:100vh;}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#0d0f14,#141c2e);border-bottom:1px solid var(--br);padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:3000;}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,#a78bfa,#7c3aed);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.hinfo h1{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;}
+.hinfo p{font-size:.72rem;color:var(--mt);}
+
+/* MODE SWITCHER */
+.mode-bar{display:flex;gap:8px;margin-left:auto;align-items:center;}
+.mode-btn{padding:7px 18px;border-radius:8px;border:1px solid var(--br);background:var(--s2);color:var(--mt);font-family:'Syne',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.mode-btn.active-comb{background:rgba(167,139,250,.2);border-color:var(--comb);color:var(--comb);}
+.mode-btn.active-prim{background:rgba(79,142,255,.2);border-color:var(--prim);color:var(--prim);}
+.mode-btn.active-jard{background:rgba(0,212,170,.2);border-color:var(--jard);color:var(--jard);}
+
+/* FILTER BAR */
+.filter-bar{background:var(--s1);border-bottom:1px solid var(--br);padding:10px 24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-height:46px;}
+.filter-bar label{font-size:.72rem;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;}
+.filter-select{background:var(--s2);border:1px solid var(--br);color:var(--tx);font-family:'DM Sans',sans-serif;font-size:.8rem;padding:5px 10px;border-radius:7px;cursor:pointer;outline:none;}
+.filter-select:focus{border-color:var(--ac);}
+.f-chip{padding:4px 10px;border-radius:12px;font-size:.7rem;font-weight:600;border:1px solid transparent;cursor:pointer;transition:all .15s;}
+.f-chip.on{opacity:1;}
+.f-chip.off{opacity:.35;}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 24px 0;}
+.kpi{background:var(--s1);border:1px solid var(--br);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.kpi.k1::before{background:linear-gradient(90deg,var(--ac4),#7c3aed);}
+.kpi.k2::before{background:linear-gradient(90deg,var(--ac),#2563eb);}
+.kpi.k3::before{background:linear-gradient(90deg,var(--ac3),#059669);}
+.kpi.k4::before{background:linear-gradient(90deg,var(--ac2),#e84545);}
+.kl{font-size:.67rem;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;}
+.kv{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;margin:2px 0 1px;line-height:1;}
+.ks{font-size:.7rem;color:var(--mt);}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:1fr 350px;gap:10px;padding:10px 24px;}
+
+/* MAP */
+.map-panel{background:var(--s1);border:1px solid var(--br);border-radius:var(--r);overflow:hidden;}
+.ph{padding:10px 14px;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pt{font-family:'Syne',sans-serif;font-size:.83rem;font-weight:700;flex:1;}
+.tg{display:flex;gap:4px;}
+.tb{padding:4px 10px;border-radius:6px;border:1px solid var(--br);background:transparent;color:var(--mt);font-size:.69rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;}
+.tb.on{background:var(--ac);border-color:var(--ac);color:#fff;}
+#map{height:460px;width:100%;}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--br);font-size:.69rem;color:var(--mt);}
+.li{display:flex;align-items:center;gap:5px;}
+.ld{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+/* SIDEBAR */
+.sb{display:flex;flex-direction:column;gap:10px;}
+.panel{background:var(--s1);border:1px solid var(--br);border-radius:var(--r);overflow:hidden;}
+.pb{padding:12px 14px;}
+.rl{display:flex;flex-direction:column;gap:6px;}
+.ri{display:grid;grid-template-columns:18px 1fr 36px;align-items:center;gap:7px;}
+.rn{color:var(--mt);font-size:.67rem;font-weight:600;text-align:right;}
+.rb{height:5px;background:var(--br);border-radius:3px;overflow:hidden;margin-top:2px;}
+.rbf{height:100%;border-radius:3px;transition:width .6s ease;}
+.rcount{font-family:'Syne',sans-serif;font-size:.85rem;font-weight:700;text-align:right;}
+
+/* BOTTOM */
+.bot{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 24px 20px;}
+table.rt{width:100%;border-collapse:collapse;font-size:.77rem;}
+table.rt th{text-align:left;padding:6px 8px;color:var(--mt);font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--br);font-weight:500;}
+table.rt td{padding:7px 8px;border-bottom:1px solid rgba(37,42,58,.5);}
+table.rt td:not(:first-child){text-align:right;}
+table.rt tr:last-child td{border-bottom:none;}
+.b2{background:rgba(0,212,170,.15);color:var(--ac3);border-radius:4px;padding:1px 6px;font-size:.65rem;font-weight:600;}
+.b5{background:rgba(255,107,53,.15);color:var(--ac2);border-radius:4px;padding:1px 6px;font-size:.65rem;font-weight:600;}
+.bf{background:rgba(122,130,153,.1);color:var(--mt);border-radius:4px;padding:1px 6px;font-size:.65rem;font-weight:600;}
+.pg{display:flex;flex-direction:column;gap:8px;}
+.prow{display:flex;justify-content:space-between;font-size:.77rem;margin-bottom:2px;}
+.pbar{height:6px;background:var(--br);border-radius:3px;overflow:hidden;}
+.pbf{height:100%;border-radius:3px;}
+
+/* POPUP */
+.leaflet-popup-content-wrapper{background:var(--s2);border:1px solid var(--br);border-radius:10px;color:var(--tx);box-shadow:0 8px 32px rgba(0,0,0,.5);}
+.leaflet-popup-tip{background:var(--s2);}
+.pu-title{font-family:'Syne',sans-serif;font-size:.88rem;font-weight:700;margin-bottom:4px;}
+.pu-row{display:flex;justify-content:space-between;gap:14px;font-size:.74rem;color:var(--mt);margin:2px 0;}
+.pu-row span:last-child{color:var(--tx);font-weight:500;}
+.pu-dir{font-size:.7rem;color:var(--mt);margin-top:3px;font-style:italic;}
+.pu-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.68rem;font-weight:700;margin-top:5px;}
+.pu-prim{background:rgba(79,142,255,.2);color:var(--prim);}
+.pu-jard{background:rgba(0,212,170,.2);color:var(--jard);}
+
+.report-btn{padding:7px 16px;border-radius:8px;border:1px solid rgba(167,139,250,.4);background:rgba(167,139,250,.12);color:#a78bfa;font-family:'Syne',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:8px;transition:all .2s;}
+.report-btn:hover{background:rgba(167,139,250,.25);border-color:#a78bfa;}
+/* MODAL INFORME */
+#reportModal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);overflow-y:auto;padding:20px;}
+#reportModal.open{display:block;}
+#reportInner{background:#fff;color:#222;max-width:860px;margin:0 auto;border-radius:10px;padding:36px 40px;position:relative;}
+#reportClose{position:absolute;top:14px;right:16px;background:#f0f0f0;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px;color:#333;}
+#reportPrint{padding:8px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:20px;}
+@media print{
+  body > *:not(#reportModal){display:none!important;}
+  #reportModal{display:block!important;position:static!important;background:none!important;padding:0!important;}
+  #reportInner{box-shadow:none!important;border-radius:0!important;padding:16px 20px!important;}
+  #reportClose,#reportPrint,.no-print{display:none!important;}
+  @page{margin:1.5cm;}
+}
+@media(max-width:900px){
+  .kpis,.grid,.bot{padding-left:14px;padding-right:14px;}
+  .kpis{grid-template-columns:1fr 1fr;}
+  .grid{grid-template-columns:1fr;}
+  .bot{grid-template-columns:1fr;}
+  .mode-bar{flex-wrap:wrap;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏫</div>
+  <div class="hinfo">
+    <h1>Área de Ubicación de Estudiantes IVP</h1>
+    <p>Zapiola 550, Turdera · Primaria + Jardín · Coordenadas geocodificadas</p>
+  </div>
+  <div class="mode-bar">
+    <button class="mode-btn active-comb" id="btn-comb" onclick="setNivel('combinado')">🔀 Combinado</button>
+    <button class="mode-btn" id="btn-prim" onclick="setNivel('primaria')">📘 Primaria</button>
+    <button class="mode-btn" id="btn-jard" onclick="setNivel('jardin')">🌱 Jardín</button>
+  </div>
+  <button class="report-btn" onclick="generarInforme()" title="Generar informe imprimible con los filtros activos">📄 Informe</button>
+</header>
+
+<!-- MODAL INFORME -->
+<div id="reportModal">
+  <div id="reportInner">
+    <button id="reportClose" onclick="cerrarInforme()">✕ Cerrar</button>
+    <button id="reportPrint" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+    <div id="reportContent"></div>
+  </div>
+</div>
+
+<div class="filter-bar" id="filterBar">
+  <span style="font-size:.75rem;color:var(--mt);font-style:italic">Seleccioná un nivel para filtrar</span>
+</div>
+
+<div class="kpis">
+  <div class="kpi k1"><div class="kl">Total estudiantes</div><div class="kv" id="k-total">—</div><div class="ks" id="k-total-s">cargando…</div></div>
+  <div class="kpi k2"><div class="kl">En radio 2 km</div><div class="kv" id="k-2km">—</div><div class="ks" id="k-2km-s">cargando…</div></div>
+  <div class="kpi k3"><div class="kl">En radio 5 km</div><div class="kv" id="k-5km">—</div><div class="ks" id="k-5km-s">cargando…</div></div>
+  <div class="kpi k4"><div class="kl">Localidad #1</div><div class="kv" id="k-loc1">—</div><div class="ks" id="k-loc1-s">cargando…</div></div>
+</div>
+
+<div class="grid">
+  <div class="map-panel">
+    <div class="ph">
+      <div class="pt" id="mapTitle">🗺 Mapa Combinado</div>
+      <div class="tg">
+        <button class="tb on" onclick="setMapMode('both',this)">Ambos</button>
+        <button class="tb" onclick="setMapMode('heat',this)">Calor</button>
+        <button class="tb" onclick="setMapMode('dots',this)">Puntos</button>
+        <button class="tb" onclick="setMapMode('radios',this)">Solo radios</button>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="legend" id="mapLegend"></div>
+  </div>
+
+  <div class="sb">
+    <div class="panel">
+      <div class="ph"><div class="pt">🏆 Top Localidades</div></div>
+      <div class="pb"><div class="rl" id="rankList"></div></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><div class="pt">📊 Distribución Top 5</div></div>
+      <div class="pb"><div style="position:relative;height:170px"><canvas id="donut"></canvas></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="bot">
+  <div class="panel">
+    <div class="ph"><div class="pt">📡 Estudiantes por Radio y Localidad</div></div>
+    <div class="pb" style="padding:0"><table class="rt"><thead><tr><th>Localidad</th><th>Dist.</th><th>N°</th><th>Zona</th></tr></thead><tbody id="radioTbl"></tbody></table></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><div class="pt">🗂 Por Partido</div></div>
+    <div class="pb"><div class="pg" id="partGrid"></div></div>
+  </div>
+</div>
+
+<script>
+const PRIMARIA = [{"n": 0, "dir": "Gral. José Matías Zapiola 550", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79158, "lng": -58.40589, "curso": "COLEGIO"}, {"n": 1, "dir": "San Jose 374", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7895523, "lng": -58.4077828, "curso": "6ºB", "dist": 0.284}, {"n": 2, "dir": "San Lorenzo 656", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7924171, "lng": -58.4071363, "curso": "6ºB", "dist": 0.147}, {"n": 3, "dir": "Santa Ana 166", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7918247, "lng": -58.4014554, "curso": "6ºB", "dist": 0.406}, {"n": 4, "dir": "Liniers 1379", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7837314, "lng": -58.413504, "curso": "6ºB", "dist": 1.116}, {"n": 5, "dir": "Benito QUinquela Martin 1644", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.818437, "lng": -58.4174682, "curso": "6ºB", "dist": 3.168}, {"n": 6, "dir": "Moyano 2335", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.819334, "lng": -58.4347672, "curso": "6ºB", "dist": 4.059}, {"n": 7, "dir": "San Rafael 442", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7903836, "lng": -58.409618, "curso": "6ºB", "dist": 0.366}, {"n": 8, "dir": "Rauch 912", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.806005, "lng": -58.420402, "curso": "6ºB", "dist": 2.081}, {"n": 9, "dir": "El Zorzal 2041", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7692279, "lng": -58.3690074, "curso": "6ºB", "dist": 4.186}, {"n": 10, "dir": "Lujan 944", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8056379, "lng": -58.421207, "curso": "6ºB", "dist": 2.098}, {"n": 11, "dir": "San Mateo 1526", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7889443, "lng": -58.4124214, "curso": "6ºB", "dist": 0.665}, {"n": 12, "dir": "San Mateo 1526", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7889443, "lng": -58.4124214, "curso": "6ºB", "dist": 0.665}, {"n": 13, "dir": "Fiedrichs 123", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7955869, "lng": -58.4312748, "curso": "6ºB", "dist": 2.36}, {"n": 14, "dir": "Kant 170", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7611823, "lng": -58.4302476, "curso": "6ºB", "dist": 4.046}, {"n": 15, "dir": "Juan B Justo 26", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7946522, "lng": -58.4177985, "curso": "6ºB", "dist": 1.14}, {"n": 16, "dir": "Santa Ana 159", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7919104, "lng": -58.4009852, "curso": "6ºB", "dist": 0.449}, {"n": 17, "dir": "Cuyo 1157", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8079371, "lng": -58.4208119, "curso": "6ºB", "dist": 2.273}, {"n": 18, "dir": "Dr Melber 781", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8042394, "lng": -58.4175422, "curso": "6ºB", "dist": 1.765}, {"n": 19, "dir": "Fernandez 2087", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7629704, "lng": -58.425953, "curso": "6ºB", "dist": 3.671}, {"n": 20, "dir": "Segurola 59", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7909629, "lng": -58.396263, "curso": "6ºB", "dist": 0.882}, {"n": 21, "dir": "Alvarado 325", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7899193, "lng": -58.4023462, "curso": "6ºB", "dist": 0.373}, {"n": 22, "dir": "Silva 215", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8051535, "lng": -58.4083128, "curso": "6ºB", "dist": 1.525}, {"n": 23, "dir": "1° de marzo 652", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8029057, "lng": -58.4177686, "curso": "6ºB", "dist": 1.662}, {"n": 24, "dir": "Soler 2105", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7913215, "lng": -58.398295, "curso": "6ºB", "dist": 0.694}, {"n": 25, "dir": "Guido Spano 1252", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7847632, "lng": -58.4011527, "curso": "6ºB", "dist": 0.873}, {"n": 26, "dir": "San José 417", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7892679, "lng": -58.4087987, "curso": "6ºB", "dist": 0.37}, {"n": 27, "dir": "1º marzo 656", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8029506, "lng": -58.4179658, "curso": "6ºB", "dist": 1.678}, {"n": 28, "dir": "La Huella 39", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7944166, "lng": -58.4187943, "curso": "6ºB", "dist": 1.22}, {"n": 29, "dir": "1° de marzo 680", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8031863, "lng": -58.4183509, "curso": "6ºB", "dist": 1.721}, {"n": 30, "dir": "Santa Maria 376", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7886726, "lng": -58.3973545, "curso": "6ºB", "dist": 0.844}, {"n": 31, "dir": "Mendoza 1205", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8052062, "lng": -58.4121975, "curso": "6ºA", "dist": 1.621}, {"n": 32, "dir": "Lujan 58", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7996158, "lng": -58.4101489, "curso": "6ºA", "dist": 0.974}, {"n": 33, "dir": "San Pedro 441", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7794367, "lng": -58.4094474, "curso": "6ºA", "dist": 1.389}, {"n": 34, "dir": "Sarratea 975", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8078659, "lng": -58.4232003, "curso": "6ºA", "dist": 2.404}, {"n": 35, "dir": "Azopardo 339", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.817176, "lng": -58.390293, "curso": "6ºA", "dist": 3.183}, {"n": 36, "dir": "San Pablo 78", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7961579, "lng": -58.410135, "curso": "6ºA", "dist": 0.64}, {"n": 37, "dir": "Lujan 333", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8009217, "lng": -58.4133743, "curso": "6ºA", "dist": 1.243}, {"n": 38, "dir": "Catamarca 169", "loc": "El Jagüel", "part": "Esteban Echeverría", "lat": -34.8246735, "lng": -58.4928111, "curso": "6ºA", "dist": 8.747}, {"n": 39, "dir": "Inca 31", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8054647, "lng": -58.4282508, "curso": "6ºA", "dist": 2.56}, {"n": 40, "dir": "Pichincha 2056", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7897198, "lng": -58.4190318, "curso": "6ºA", "dist": 1.218}, {"n": 41, "dir": "Castelli 1171", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8033094, "lng": -58.3859452, "curso": "6ºA", "dist": 2.24}, {"n": 42, "dir": "Dean Funes 1111", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.804964, "lng": -58.4136453, "curso": "6ºA", "dist": 1.648}, {"n": 43, "dir": "Luis Davila 989", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8079419, "lng": -58.4186349, "curso": "6ºA", "dist": 2.16}, {"n": 44, "dir": "Alvarado 366", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7898599, "lng": -58.4019793, "curso": "6ºA", "dist": 0.405}, {"n": 45, "dir": "Polonia 1401", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8121226, "lng": -58.4226043, "curso": "6ºA", "dist": 2.747}, {"n": 46, "dir": "Santo Tomas 135", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7901036, "lng": -58.4014441, "curso": "6ºA", "dist": 0.438}, {"n": 47, "dir": "Gorriti 352 6b", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7617598, "lng": -58.4020268, "curso": "6ºA", "dist": 3.335}, {"n": 48, "dir": "La Huella 433", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.791221, "lng": -58.4211107, "curso": "6ºA", "dist": 1.39}, {"n": 49, "dir": "Guido Spano 1990", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7896082, "lng": -58.3975117, "curso": "6ºA", "dist": 0.796}, {"n": 50, "dir": "Neuquen 4187", "loc": "Canning", "part": "Ezeiza", "lat": -34.8592186, "lng": -58.5368967, "curso": "6ºA", "dist": 14.127}, {"n": 51, "dir": "30 de Septiembre 786", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.7932112, "lng": -58.4000598, "curso": "6ºA", "dist": 0.562}, {"n": 52, "dir": "Liniers 1591", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7847977, "lng": -58.4155597, "curso": "6ºA", "dist": 1.161}, {"n": 53, "dir": "Amenedo 480", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.7984626, "lng": -58.4024732, "curso": "6ºA", "dist": 0.826}, {"n": 54, "dir": "Lavalle 1055", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7786002, "lng": -58.4123055, "curso": "6ºA", "dist": 1.558}, {"n": 55, "dir": "Lujan 1137", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8063232, "lng": -58.4231328, "curso": "6ºA", "dist": 2.273}, {"n": 56, "dir": "San Antonio 577", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7841174, "lng": -58.4030167, "curso": "6ºA", "dist": 0.87}, {"n": 57, "dir": "Cruz Varela 296", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.794717, "lng": -58.421, "curso": "6ºA", "dist": 1.423}, {"n": 58, "dir": "Kurt 339", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7965057, "lng": -58.4292259, "curso": "6ºA", "dist": 2.2}, {"n": 59, "dir": "Charlone 820", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8045705, "lng": -58.4187092, "curso": "6ºA", "dist": 1.859}, {"n": 60, "dir": "Luján 343", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8010241, "lng": -58.4134857, "curso": "6ºA", "dist": 1.259}, {"n": 61, "dir": "Saenz 639", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7573693, "lng": -58.4055109, "curso": "6ºA", "dist": 3.804}, {"n": 62, "dir": "Ibañez 1526", "loc": "San Vicente", "part": "San Vicente", "lat": -35.0081363, "lng": -58.4481682, "curso": "6ºA", "dist": 24.387}, {"n": 63, "dir": "Sarmiento 341 5B", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7642524, "lng": -58.4051618, "curso": "5ºB", "dist": 3.039}, {"n": 64, "dir": "Ombú 52", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8196194, "lng": -58.4344092, "curso": "5ºB", "dist": 4.062}, {"n": 65, "dir": "San Joaquin 470", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7892289, "lng": -58.3986545, "curso": "5ºB", "dist": 0.711}, {"n": 66, "dir": "Santo Domingo 895", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8246258, "lng": -58.4023372, "curso": "5ºB", "dist": 3.689}, {"n": 67, "dir": "Conscripto Bernardi 54", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.7853126, "lng": -58.3942649, "curso": "5ºB", "dist": 1.27}, {"n": 68, "dir": "Avellaneda 2333", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8178192, "lng": -58.3857901, "curso": "5ºB", "dist": 3.447}, {"n": 69, "dir": "Guido Spano 171", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7755578, "lng": -58.4091974, "curso": "5ºB", "dist": 1.807}, {"n": 70, "dir": "J Newbery 956", "loc": "Monte Grande", "part": "Esteban Echeverría", "lat": -34.8385797, "lng": -58.5072644, "curso": "5ºB", "dist": 10.628}, {"n": 71, "dir": "Diaz velez 2320", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8169915, "lng": -58.4288764, "curso": "5ºB", "dist": 3.52}, {"n": 72, "dir": "Sastre 503", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8062183, "lng": -58.4121363, "curso": "5ºB", "dist": 1.725}, {"n": 73, "dir": "Cuyo 1530", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8099365, "lng": -58.4248052, "curso": "5ºB", "dist": 2.674}, {"n": 74, "dir": "Avellaneda 1250", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8084077, "lng": -58.3927037, "curso": "5ºB", "dist": 2.225}, {"n": 75, "dir": "San Basilio 233", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7862115, "lng": -58.4059983, "curso": "5ºB", "dist": 0.597}, {"n": 76, "dir": "Puig 344", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7899309, "lng": -58.4026554, "curso": "5ºB", "dist": 0.348}, {"n": 77, "dir": "Avenida Argentina 2460", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7893264, "lng": -58.4084369, "curso": "5ºB", "dist": 0.342}, {"n": 78, "dir": "Sarmiento 968", "loc": "Monte Grande", "part": "Esteban Echeverría", "lat": -34.8031016, "lng": -58.4735839, "curso": "5ºB", "dist": 6.313}, {"n": 79, "dir": "Aristobulo del Valle 80", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7960322, "lng": -58.4289554, "curso": "5ºB", "dist": 2.164}, {"n": 80, "dir": "Davila 318", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8042159, "lng": -58.410383, "curso": "5ºB", "dist": 1.464}, {"n": 81, "dir": "Polonia 1361", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8118556, "lng": -58.4230762, "curso": "5ºB", "dist": 2.747}, {"n": 82, "dir": "25 de Mayo 374", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7790113, "lng": -58.4019939, "curso": "5ºB", "dist": 1.442}, {"n": 83, "dir": "Frias 2969", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7905169, "lng": -58.4168919, "curso": "5ºB", "dist": 1.012}, {"n": 84, "dir": "9 de julio 1225", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7877245, "lng": -58.4114336, "curso": "5ºB", "dist": 0.663}, {"n": 85, "dir": "Guido Spano 2181", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7911036, "lng": -58.3967826, "curso": "5ºB", "dist": 0.833}, {"n": 86, "dir": "Agüero 357", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7901282, "lng": -58.4078138, "curso": "5ºB", "dist": 0.239}, {"n": 87, "dir": "Tacuari 25", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7935081, "lng": -58.4256964, "curso": "5ºB", "dist": 1.821}, {"n": 88, "dir": "Agrelo 671", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7869706, "lng": -58.4324783, "curso": "5ºB", "dist": 2.482}, {"n": 89, "dir": "El Cabo 115", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7940243, "lng": -58.4200354, "curso": "5ºB", "dist": 1.32}, {"n": 90, "dir": "Duhalde 141", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8050176, "lng": -58.4349022, "curso": "5ºB", "dist": 3.041}, {"n": 91, "dir": "San Raimundo 557", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7909488, "lng": -58.3973451, "curso": "5ºB", "dist": 0.783}, {"n": 92, "dir": "Alsina 923", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8052697, "lng": -58.3954085, "curso": "5ºA", "dist": 1.798}, {"n": 93, "dir": "Bradley 210", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8012352, "lng": -58.3889046, "curso": "5ºA", "dist": 1.886}, {"n": 94, "dir": "Mariano Acosta 768", "loc": "Monte Grande", "part": "Esteban Echeverría", "lat": -34.8224568, "lng": -58.4771172, "curso": "5ºA", "dist": 7.354}, {"n": 95, "dir": "San joaquin 439", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7895635, "lng": -58.3987654, "curso": "5ºA", "dist": 0.688}, {"n": 96, "dir": "Irala 205", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7943875, "lng": -58.4244432, "curso": "5ºA", "dist": 1.723}, {"n": 97, "dir": "Echagüe 1272", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8270099, "lng": -58.4099475, "curso": "5ºA", "dist": 3.957}, {"n": 98, "dir": "Victoria 436", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7902809, "lng": -58.4210918, "curso": "5ºA", "dist": 1.396}, {"n": 99, "dir": "Avellaneda 980", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7797115, "lng": -58.408433, "curso": "5ºA", "dist": 1.34}, {"n": 100, "dir": "San Blas 340", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7831387, "lng": -58.4192924, "curso": "5ºA", "dist": 1.542}, {"n": 101, "dir": "Puig 601", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7925637, "lng": -58.4034548, "curso": "5ºA", "dist": 0.248}, {"n": 102, "dir": "Santo Tomas 40", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7869818, "lng": -58.4361335, "curso": "5ºA", "dist": 2.809}, {"n": 103, "dir": "Aragón 787", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7886799, "lng": -58.4190224, "curso": "5ºA", "dist": 1.242}, {"n": 104, "dir": "San Roque 61", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7887712, "lng": -58.4102995, "curso": "5ºA", "dist": 0.51}, {"n": 105, "dir": "San José 380", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7895455, "lng": -58.4078373, "curso": "5ºA", "dist": 0.288}, {"n": 106, "dir": "Pje. Malvinas 3687", "loc": "Remedios de Escalada", "part": "Lanús", "lat": -34.7189054, "lng": -58.4228646, "curso": "5ºA", "dist": 8.228}, {"n": 107, "dir": "Vicente Lopez 1992", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7893089, "lng": -58.3963147, "curso": "5ºA", "dist": 0.91}, {"n": 108, "dir": "Alberto Gomez 378", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7610595, "lng": -58.429428, "curso": "5ºA", "dist": 4.017}, {"n": 109, "dir": "Wilde 287", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8067127, "lng": -58.4345339, "curso": "5ºA", "dist": 3.11}, {"n": 110, "dir": "Davila 1048", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8086287, "lng": -58.420116, "curso": "5ºA", "dist": 2.298}, {"n": 111, "dir": "Suipacha 227", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7910601, "lng": -58.4062064, "curso": "5ºA", "dist": 0.065}, {"n": 112, "dir": "San Benito 1055", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7978323, "lng": -58.4096361, "curso": "5ºA", "dist": 0.775}, {"n": 113, "dir": "San Lorenzo 481", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7908399, "lng": -58.4071645, "curso": "5ºA", "dist": 0.143}, {"n": 114, "dir": "Zapiola 287", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7894506, "lng": -58.405763, "curso": "5ºA", "dist": 0.237}, {"n": 115, "dir": "Olleros 539", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.791609, "lng": -58.4302684, "curso": "5ºA", "dist": 2.226}, {"n": 116, "dir": "San Luis 1092", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7909885, "lng": -58.414455, "curso": "5ºA", "dist": 0.785}, {"n": 117, "dir": "Mariño 1315", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7869195, "lng": -58.4120597, "curso": "5ºA", "dist": 0.766}, {"n": 118, "dir": "Manzana 7 casa 12", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.822376, "lng": -58.3501891, "curso": "5ºA", "dist": 6.131}, {"n": 119, "dir": "Olleros 590", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7909614, "lng": -58.4299839, "curso": "5ºA", "dist": 2.201}, {"n": 120, "dir": "El Rosedal 592", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7920018, "lng": -58.4291487, "curso": "4ºB", "dist": 2.124}, {"n": 121, "dir": "Sempere 2025", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8160183, "lng": -58.3753469, "curso": "4ºB", "dist": 3.894}, {"n": 122, "dir": "Rauch 912", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.806005, "lng": -58.420402, "curso": "4ºB", "dist": 2.081}, {"n": 123, "dir": "Padre Bruno 175", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7887108, "lng": -58.4042763, "curso": "4ºB", "dist": 0.351}, {"n": 124, "dir": "El Zorzal 2041", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7692279, "lng": -58.3690074, "curso": "4ºB", "dist": 4.186}, {"n": 125, "dir": "Uriburu 50", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.7936027, "lng": -58.3995776, "curso": "4ºB", "dist": 0.619}, {"n": 126, "dir": "Policastro 2044", "loc": "Malvinas Argentinas", "part": "Esteban Echeverría", "lat": -34.8183915, "lng": -58.4230279, "curso": "4ºB", "dist": 3.367}, {"n": 127, "dir": "Av meeks 1022", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.773015, "lng": -58.3974897, "curso": "4ºB", "dist": 2.202}, {"n": 128, "dir": "Benito Quinquela Martin 1316", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8168707, "lng": -58.413639, "curso": "4ºB", "dist": 2.9}, {"n": 129, "dir": "Bahía blanca 890", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8129865, "lng": -58.4316567, "curso": "4ºB", "dist": 3.347}, {"n": 130, "dir": "Santa Ana 272", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7595457, "lng": -58.3464462, "curso": "4ºB", "dist": 6.493}, {"n": 131, "dir": "Puig 513", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.791776, "lng": -58.403254, "curso": "4ºB", "dist": 0.242}, {"n": 132, "dir": "Zapiola 684", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7927872, "lng": -58.4059951, "curso": "4ºB", "dist": 0.135}, {"n": 133, "dir": "Jacinto Viera 226", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7973213, "lng": -58.4121003, "curso": "4ºB", "dist": 0.854}, {"n": 134, "dir": "Duhalde 368", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8068671, "lng": -58.4329932, "curso": "4ºB", "dist": 3.002}, {"n": 135, "dir": "San Benito 115", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7913135, "lng": -58.414587, "curso": "4ºB", "dist": 0.795}, {"n": 136, "dir": "Soler 200", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8088427, "lng": -58.4068258, "curso": "4ºB", "dist": 1.921}, {"n": 137, "dir": "Aragon 198", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7953954, "lng": -58.4142101, "curso": "4ºB", "dist": 0.87}, {"n": 138, "dir": "San Rafael 7", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7862212, "lng": -58.4097481, "curso": "4ºB", "dist": 0.692}, {"n": 139, "dir": "Pino 1995", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8219806, "lng": -58.4192346, "curso": "4ºB", "dist": 3.593}, {"n": 140, "dir": "Nestor de la Peña 196", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7915434, "lng": -58.427513, "curso": "4ºB", "dist": 1.975}, {"n": 141, "dir": "Malvinas 1462", "loc": "Malvinas Argentinas", "part": "Esteban Echeverría", "lat": -34.8005368, "lng": -58.4807236, "curso": "4ºB", "dist": 6.905}, {"n": 142, "dir": "Luzuriaga 65", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7955148, "lng": -58.4296101, "curso": "4ºB", "dist": 2.21}, {"n": 143, "dir": "Patricios 519", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7933343, "lng": -58.410738, "curso": "4ºB", "dist": 0.484}, {"n": 144, "dir": "Patricios 519", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7933343, "lng": -58.410738, "curso": "4ºB", "dist": 0.484}, {"n": 145, "dir": "Mendoza 1205", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8052062, "lng": -58.4121975, "curso": "4ºA", "dist": 1.621}, {"n": 146, "dir": "Padre Bruno 296", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7897405, "lng": -58.4041742, "curso": "4ºA", "dist": 0.258}, {"n": 147, "dir": "German Kurth 474", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8066882, "lng": -58.4314972, "curso": "4ºA", "dist": 2.879}, {"n": 148, "dir": "Friedrichs 947", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7879705, "lng": -58.437004, "curso": "4ºA", "dist": 2.87}, {"n": 149, "dir": "Alvarado 603", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7919401, "lng": -58.4008103, "curso": "4ºA", "dist": 0.466}, {"n": 150, "dir": "San Francisco 248", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7825524, "lng": -58.4180724, "curso": "4ºA", "dist": 1.498}, {"n": 151, "dir": "San Mateo 1155", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7867979, "lng": -58.414501, "curso": "4ºA", "dist": 0.949}, {"n": 152, "dir": "Irala 205", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7943875, "lng": -58.4244432, "curso": "4ºA", "dist": 1.723}, {"n": 153, "dir": "Lavalle 1240", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7801414, "lng": -58.4143028, "curso": "4ºA", "dist": 1.486}, {"n": 154, "dir": "Gral Paz 2048", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7858012, "lng": -58.4214216, "curso": "4ºA", "dist": 1.557}, {"n": 155, "dir": "Santo Tomas 245", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.789458, "lng": -58.4002041, "curso": "4ºA", "dist": 0.57}, {"n": 156, "dir": "Lujan 1048", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8062228, "lng": -58.4224964, "curso": "4ºA", "dist": 2.225}, {"n": 157, "dir": "9 de Julio 1338", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7884227, "lng": -58.4121159, "curso": "4ºA", "dist": 0.668}, {"n": 158, "dir": "Chacabuco 1274", "loc": "Luis Guillón", "part": "Esteban Echeverría", "lat": -34.820045, "lng": -58.4429401, "curso": "4ºA", "dist": 4.633}, {"n": 159, "dir": "Mononlock 2", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8045218, "lng": -58.4262107, "curso": "4ºA", "dist": 2.348}, {"n": 160, "dir": "La Pampa 2060", "loc": "San José", "part": "Lomas de Zamora", "lat": -34.7777983, "lng": -58.3454196, "curso": "4ºA", "dist": 5.731}, {"n": 161, "dir": "San Luis 1268", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7910071, "lng": -58.4141117, "curso": "4ºA", "dist": 0.753}, {"n": 162, "dir": "Soler 1837", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7893589, "lng": -58.3997477, "curso": "4ºA", "dist": 0.613}, {"n": 163, "dir": "Sarratea 1290", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8099918, "lng": -58.4212609, "curso": "4ºA", "dist": 2.482}, {"n": 164, "dir": "Gral Roca 257", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.7948988, "lng": -58.3970451, "curso": "4ºA", "dist": 0.888}, {"n": 165, "dir": "Montiel 1366", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8157811, "lng": -58.3762383, "curso": "4ºA", "dist": 3.817}, {"n": 166, "dir": "Ascasubi 1555", "loc": "Luis Guillón", "part": "Esteban Echeverría", "lat": -34.8160164, "lng": -58.4411885, "curso": "4ºA", "dist": 4.215}, {"n": 167, "dir": "Azcuénaga 193", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7928274, "lng": -58.4058762, "curso": "4ºA", "dist": 0.139}, {"n": 168, "dir": "Monoblok 5", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7965057, "lng": -58.4292259, "curso": "4ºA", "dist": 2.2}, {"n": 169, "dir": "Santa Maria 298", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.787078, "lng": -58.4049771, "curso": "4ºA", "dist": 0.507}, {"n": 170, "dir": "San Luis 869", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7889829, "lng": -58.4109346, "curso": "4ºA", "dist": 0.544}, {"n": 171, "dir": "San Luis 213", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7890209, "lng": -58.4028709, "curso": "4ºA", "dist": 0.396}, {"n": 172, "dir": "San Mariano 732", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7859842, "lng": -58.4042777, "curso": "4ºA", "dist": 0.639}, {"n": 173, "dir": "Magallanes 634", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7983462, "lng": -58.4216319, "curso": "4ºA", "dist": 1.622}, {"n": 174, "dir": "Tacuari 278", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7946185, "lng": -58.4244334, "curso": "4ºA", "dist": 1.727}, {"n": 175, "dir": "San Joaquín 555", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7889629, "lng": -58.3975836, "curso": "4ºA", "dist": 0.812}, {"n": 176, "dir": "Sarratea 1385", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8109004, "lng": -58.4208832, "curso": "3ºB", "dist": 2.547}, {"n": 177, "dir": "Soler 2091", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.791909, "lng": -58.3976823, "curso": "3ºB", "dist": 0.75}, {"n": 178, "dir": "Bradley 210", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8012352, "lng": -58.3889046, "curso": "3ºB", "dist": 1.886}, {"n": 179, "dir": "Victoria 193", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7920876, "lng": -58.4240379, "curso": "3ºB", "dist": 1.658}, {"n": 180, "dir": "Loria 341", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7624075, "lng": -58.4020392, "curso": "3ºB", "dist": 3.263}, {"n": 181, "dir": "Lago Argentino 1450", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7728374, "lng": -58.4213432, "curso": "3ºB", "dist": 2.517}, {"n": 182, "dir": "Martín Rodriguez 527", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8013787, "lng": -58.4010105, "curso": "3ºB", "dist": 1.177}, {"n": 183, "dir": "Reconquista 30", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7925904, "lng": -58.4038322, "curso": "3ºB", "dist": 0.219}, {"n": 184, "dir": "1º Junta 374", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7932685, "lng": -58.4008485, "curso": "3ºB", "dist": 0.497}, {"n": 185, "dir": "Cuyo 955", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8063782, "lng": -58.418315, "curso": "3ºB", "dist": 1.999}, {"n": 186, "dir": "Juan Sebastian Elcano 5248", "loc": "Malvinas Argentinas", "part": "Esteban Echeverría", "lat": -34.76442, "lng": -58.48826, "curso": "3ºB", "dist": 8.107}, {"n": 187, "dir": "Jacinto Viera 226", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7973213, "lng": -58.4121003, "curso": "3ºB", "dist": 0.854}, {"n": 188, "dir": "Viena 1004", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7761279, "lng": -58.4295866, "curso": "3ºB", "dist": 2.763}, {"n": 189, "dir": "Rauch 831", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8054221, "lng": -58.4210529, "curso": "3ºB", "dist": 2.07}, {"n": 190, "dir": "9 de Julio 958", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7866703, "lng": -58.4086267, "curso": "3ºB", "dist": 0.6}, {"n": 191, "dir": "Melber 776", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8044696, "lng": -58.4174396, "curso": "3ºB", "dist": 1.779}, {"n": 192, "dir": "Profesor Mariño 250", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7807851, "lng": -58.3999421, "curso": "3ºB", "dist": 1.318}, {"n": 193, "dir": "14 de Julio 735", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7704098, "lng": -58.3856098, "curso": "3ºB", "dist": 2.995}, {"n": 194, "dir": "Alvarado 663", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7920924, "lng": -58.4006364, "curso": "3ºB", "dist": 0.483}, {"n": 195, "dir": "Magallanes 368", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8001699, "lng": -58.425243, "curso": "3ºB", "dist": 2.009}, {"n": 196, "dir": "Davila 1048", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8086287, "lng": -58.420116, "curso": "3ºB", "dist": 2.298}, {"n": 197, "dir": "Triunvirato 100", "loc": "Monte Grande", "part": "Esteban Echeverría", "lat": -34.8416297, "lng": -58.447316, "curso": "3ºB", "dist": 6.729}, {"n": 198, "dir": "Gibson 324", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7995885, "lng": -58.4262239, "curso": "3ºB", "dist": 2.059}, {"n": 199, "dir": "San Mateo 355", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.792016, "lng": -58.4102104, "curso": "3ºB", "dist": 0.397}, {"n": 200, "dir": "Argentine 2086", "loc": "Guernica", "part": "Presidente Perón", "lat": -34.9174844, "lng": -58.3778267, "curso": "3ºB", "dist": 14.232}, {"n": 201, "dir": "Av. H.Yrigoyen 14695", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8248316, "lng": -58.3973545, "curso": "3ºB", "dist": 3.779}, {"n": 202, "dir": "Av. Del Rey 1248", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8053198, "lng": -58.416436, "curso": "3ºB", "dist": 1.806}, {"n": 203, "dir": "Irala 678", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7922004, "lng": -58.4197958, "curso": "3ºB", "dist": 1.272}, {"n": 204, "dir": "Echeverria 27", "loc": "José Marmol", "part": "Almirante Brown", "lat": -34.7851575, "lng": -58.3845005, "curso": "3ºB", "dist": 2.08}, {"n": 205, "dir": "Conscripto Bernardi 3530", "loc": "José Marmol", "part": "Almirante Brown", "lat": -34.7777615, "lng": -58.365853, "curso": "3ºB", "dist": 3.966}, {"n": 206, "dir": "Gibson 1197", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7936924, "lng": -58.4142925, "curso": "3ºB", "dist": 0.802}, {"n": 207, "dir": "Fiedrichs 154", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.795969, "lng": -58.4315718, "curso": "3ºA", "dist": 2.395}, {"n": 208, "dir": "San Blas 49", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7879302, "lng": -58.4161833, "curso": "3ºA", "dist": 1.024}, {"n": 209, "dir": "Frias 196", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.7977476, "lng": -58.4061175, "curso": "3ºA", "dist": 0.686}, {"n": 210, "dir": "San Rafael 442", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7903836, "lng": -58.409618, "curso": "3ºA", "dist": 0.366}, {"n": 211, "dir": "Puig 645", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7928726, "lng": -58.4035188, "curso": "3ºA", "dist": 0.26}, {"n": 212, "dir": "Armonia 169", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7914427, "lng": -58.425127, "curso": "3ºA", "dist": 1.757}, {"n": 213, "dir": "Pichincha 1508", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7874136, "lng": -58.4141417, "curso": "3ºA", "dist": 0.885}, {"n": 214, "dir": "Av. H.Yrigoyen 10243", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7761086, "lng": -58.4056826, "curso": "3ºA", "dist": 1.72}, {"n": 215, "dir": "9 de Julio 1099", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7872687, "lng": -58.4102836, "curso": "3ºA", "dist": 0.625}, {"n": 216, "dir": "Ascasubi 90", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8013946, "lng": -58.4239432, "curso": "3ºA", "dist": 1.977}, {"n": 217, "dir": "Ascasubi 90", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8013946, "lng": -58.4239432, "curso": "3ºA", "dist": 1.977}, {"n": 218, "dir": "Santa Ana 159", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7919104, "lng": -58.4009852, "curso": "3ºA", "dist": 0.449}, {"n": 219, "dir": "Jacinto Viera 290", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7977445, "lng": -58.4117633, "curso": "3ºA", "dist": 0.87}, {"n": 220, "dir": "San Benito 929", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7967653, "lng": -58.4104925, "curso": "3ºA", "dist": 0.713}, {"n": 221, "dir": "Reconquista 264", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7921959, "lng": -58.4066387, "curso": "3ºA", "dist": 0.097}, {"n": 222, "dir": "Suipacha 41", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.791352, "lng": -58.4038688, "curso": "3ºA", "dist": 0.186}, {"n": 223, "dir": "Av Antartida Argentina 246", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7907066, "lng": -58.4106102, "curso": "3ºA", "dist": 0.442}, {"n": 224, "dir": "G. Spano 1990", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7896082, "lng": -58.3975117, "curso": "3ºA", "dist": 0.796}, {"n": 225, "dir": "Los Studs 2197", "loc": "Longchamps", "part": "Almirante Brown", "lat": -34.8698633, "lng": -58.3915768, "curso": "3ºA", "dist": 8.802}, {"n": 226, "dir": "Los Studs 2197", "loc": "Longchamps", "part": "Almirante Brown", "lat": -34.8698633, "lng": -58.3915768, "curso": "3ºA", "dist": 8.802}, {"n": 227, "dir": "Melber 372", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8018369, "lng": -58.4127909, "curso": "3ºA", "dist": 1.303}, {"n": 228, "dir": "Dean Funes 768", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8018449, "lng": -58.4157106, "curso": "3ºA", "dist": 1.452}, {"n": 229, "dir": "Wright 95", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7964759, "lng": -58.4146955, "curso": "3ºA", "dist": 0.971}, {"n": 230, "dir": "San Antonio 577", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7841174, "lng": -58.4030167, "curso": "3ºA", "dist": 0.87}, {"n": 231, "dir": "German Kurth 339", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7967647, "lng": -58.4127901, "curso": "3ºA", "dist": 0.854}, {"n": 232, "dir": "San Blas 353", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7934019, "lng": -58.411822, "curso": "3ºA", "dist": 0.578}, {"n": 233, "dir": "Hernandez 3766", "loc": "Remedios de Escalada", "part": "Lanús", "lat": -34.7200743, "lng": -58.4124806, "curso": "3ºA", "dist": 7.974}, {"n": 234, "dir": "Segui 283", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80598, "lng": -58.4083924, "curso": "3ºA", "dist": 1.617}, {"n": 235, "dir": "Loria 574", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7626787, "lng": -58.4052001, "curso": "2ºB", "dist": 3.214}, {"n": 236, "dir": "1º marzo 656", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8029506, "lng": -58.4179658, "curso": "2ºB", "dist": 1.678}, {"n": 237, "dir": "Tacuari 278", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7946185, "lng": -58.4244334, "curso": "2ºB", "dist": 1.727}, {"n": 238, "dir": "Tupac Amaru 1070", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8099309, "lng": -58.4255383, "curso": "2ºB", "dist": 2.717}, {"n": 239, "dir": "San Jose 31", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7898351, "lng": -58.4035147, "curso": "2ºB", "dist": 0.291}, {"n": 240, "dir": "Doyhenard 680", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8019921, "lng": -58.4230821, "curso": "2ºB", "dist": 1.951}, {"n": 241, "dir": "Ibañez 1526", "loc": "San Vicente", "part": "San Vicente", "lat": -35.0081363, "lng": -58.4481682, "curso": "2ºB", "dist": 24.387}, {"n": 242, "dir": "1º de marzo 1261", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.801625, "lng": -58.4166293, "curso": "2ºB", "dist": 1.486}, {"n": 243, "dir": "9 de julio 944", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7865406, "lng": -58.4085693, "curso": "2ºB", "dist": 0.611}, {"n": 244, "dir": "Tupac Amaru 50", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8021585, "lng": -58.4314856, "curso": "2ºB", "dist": 2.616}, {"n": 245, "dir": "Boga 48", "loc": "Malvinas Argentinas", "part": "Esteban Echeverría", "lat": -34.8332496, "lng": -58.4744185, "curso": "2ºB", "dist": 7.785}, {"n": 246, "dir": "Liniers 1379", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7837314, "lng": -58.413504, "curso": "2ºB", "dist": 1.116}, {"n": 247, "dir": "Timbo 148", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8215055, "lng": -58.4351401, "curso": "2ºB", "dist": 4.267}, {"n": 248, "dir": "Ferrarotti 1364", "loc": "9 de Abril", "part": "Esteban Echeverría", "lat": -34.77596832747901, "lng": -58.47534821957434, "curso": "2ºB", "dist": 6.577}, {"n": 249, "dir": "Los Robles 49", "loc": "El Jagüel", "part": "Esteban Echeverría", "lat": -34.827797, "lng": -58.4959271, "curso": "2ºB", "dist": 9.154}, {"n": 250, "dir": "Irala 67", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7953008, "lng": -58.4273171, "curso": "2ºB", "dist": 2.0}, {"n": 251, "dir": "Gral Paz 1264", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7812453, "lng": -58.4137508, "curso": "2ºB", "dist": 1.355}, {"n": 252, "dir": "Tupac Amaru 1255", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8113129, "lng": -58.4245493, "curso": "2ºB", "dist": 2.778}, {"n": 253, "dir": "San Mateo 1170", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7867173, "lng": -58.4142071, "curso": "2ºB", "dist": 0.932}, {"n": 254, "dir": "Soler 2044", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7907055, "lng": -58.3982941, "curso": "2ºB", "dist": 0.7}, {"n": 255, "dir": "Charlone 610", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8028438, "lng": -58.4206038, "curso": "2ºB", "dist": 1.837}, {"n": 256, "dir": "Buenaventura 420", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7878183, "lng": -58.4083396, "curso": "2ºB", "dist": 0.474}, {"n": 257, "dir": "Ucrania 215", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8050077, "lng": -58.4327452, "curso": "2ºB", "dist": 2.871}, {"n": 258, "dir": "San Blas 150", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7884093, "lng": -58.415382, "curso": "2ºB", "dist": 0.936}, {"n": 259, "dir": "Av. Meeks 1022", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.773015, "lng": -58.3974897, "curso": "2ºB", "dist": 2.202}, {"n": 260, "dir": "La Huella 146", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7935873, "lng": -58.4199222, "curso": "2ºB", "dist": 1.301}, {"n": 261, "dir": "Araguaya 71", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7825521, "lng": -58.4249629, "curso": "2ºB", "dist": 2.01}, {"n": 262, "dir": "Santa Ana 272", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7911644, "lng": -58.4002544, "curso": "2ºB", "dist": 0.517}, {"n": 263, "dir": "S. Ortiz 637", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7678337, "lng": -58.3792534, "curso": "2ºB", "dist": 3.59}, {"n": 264, "dir": "Bouchard 1036", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8051079, "lng": -58.4158704, "curso": "2ºA", "dist": 1.759}, {"n": 265, "dir": "San Basilio 301", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7861209, "lng": -58.4068444, "curso": "2ºA", "dist": 0.613}, {"n": 266, "dir": "Moyano 2627", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.819334, "lng": -58.4347672, "curso": "2ºA", "dist": 4.059}, {"n": 267, "dir": "Av. Del Rey 880", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8038591, "lng": -58.4169733, "curso": "2ºA", "dist": 1.7}, {"n": 268, "dir": "Mercedes 428", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8115168, "lng": -58.4294116, "curso": "2ºA", "dist": 3.087}, {"n": 269, "dir": "Mendoza 1352", "loc": "Luis Guillón", "part": "Esteban Echeverría", "lat": -34.8166471, "lng": -58.4377226, "curso": "2ºA", "dist": 4.027}, {"n": 270, "dir": "Doyhenard 461", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8030719, "lng": -58.4231761, "curso": "2ºA", "dist": 2.031}, {"n": 271, "dir": "Guido Spano 2091", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7904512, "lng": -58.3972663, "curso": "2ºA", "dist": 0.797}, {"n": 272, "dir": "Masilla 328", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7965057, "lng": -58.4292259, "curso": "2ºA", "dist": 2.2}, {"n": 273, "dir": "9 de Julio 1225", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7877245, "lng": -58.4114336, "curso": "2ºA", "dist": 0.663}, {"n": 274, "dir": "Ombu 52", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8196194, "lng": -58.4344092, "curso": "2ºA", "dist": 4.062}, {"n": 275, "dir": "Profesor Mariño 2158", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7912065, "lng": -58.4194674, "curso": "2ºA", "dist": 1.241}, {"n": 276, "dir": "La Huella 540 L", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7904707, "lng": -58.4222025, "curso": "2ºA", "dist": 1.495}, {"n": 277, "dir": "Profesor Mariño 1558", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7887162, "lng": -58.4146181, "curso": "2ºA", "dist": 0.858}, {"n": 278, "dir": "Capitan de Fragata Moyano 2335", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.816571, "lng": -58.4291873, "curso": "2ºA", "dist": 3.5}, {"n": 279, "dir": "San Vladimiro 705", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8006326, "lng": -58.414361, "curso": "2ºA", "dist": 1.269}, {"n": 280, "dir": "Castelli 1171", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8033094, "lng": -58.3859452, "curso": "2ºA", "dist": 2.24}, {"n": 281, "dir": "Glade 833", "loc": "Banfield", "part": "Lomas de Zamora", "lat": -34.7366162, "lng": -58.4225746, "curso": "2ºA", "dist": 6.299}, {"n": 282, "dir": "Necochea 1338", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8100832, "lng": -58.4225658, "curso": "2ºA", "dist": 2.56}, {"n": 283, "dir": "25 de Mayo 1190", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.791777, "lng": -58.3665258, "curso": "2ºA", "dist": 3.595}, {"n": 284, "dir": "Cordoba 945", "loc": "Monte Grande", "part": "Esteban Echeverría", "lat": -34.8236684, "lng": -58.4459228, "curso": "2ºA", "dist": 5.108}, {"n": 285, "dir": "Alamo 2290", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8249344, "lng": -58.4236802, "curso": "2ºA", "dist": 4.049}, {"n": 286, "dir": "Zapiola 863", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7941013, "lng": -58.4065151, "curso": "2ºA", "dist": 0.286}, {"n": 287, "dir": "Zapiola 190", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7887608, "lng": -58.4051988, "curso": "2ºA", "dist": 0.32}, {"n": 288, "dir": "Dr. Melber 781", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8042394, "lng": -58.4175422, "curso": "2ºA", "dist": 1.765}, {"n": 289, "dir": "Enz 680", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7988648, "lng": -58.4205075, "curso": "2ºA", "dist": 1.561}, {"n": 290, "dir": "Juan B Justo 997", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8024178, "lng": -58.4116767, "curso": "2ºA", "dist": 1.316}, {"n": 291, "dir": "Rosales 1121", "loc": "Luis Guillón", "part": "Esteban Echeverría", "lat": -34.8107271, "lng": -58.4376701, "curso": "2ºA", "dist": 3.599}, {"n": 292, "dir": "Silva 215", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8051535, "lng": -58.4083128, "curso": "2ºA", "dist": 1.525}, {"n": 293, "dir": "Olavarria 75", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7945793, "lng": -58.4281915, "curso": "2ºA", "dist": 2.064}, {"n": 294, "dir": "Amenedo 480", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.7984626, "lng": -58.4024732, "curso": "1ºB", "dist": 0.826}, {"n": 295, "dir": "Conscripto Bernardi 530", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7832137, "lng": -58.3902014, "curso": "1ºB", "dist": 1.708}, {"n": 296, "dir": "Bahia Blanca 1040", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8141606, "lng": -58.4307006, "curso": "1ºB", "dist": 3.382}, {"n": 297, "dir": "El Rosedal 525", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7918591, "lng": -58.4282584, "curso": "1ºB", "dist": 2.043}, {"n": 298, "dir": "Sastre 857", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8075402, "lng": -58.4160988, "curso": "1ºB", "dist": 2.005}, {"n": 299, "dir": "Lujan 343", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8010241, "lng": -58.4134857, "curso": "1ºB", "dist": 1.259}, {"n": 300, "dir": "El Cabo 115", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7940243, "lng": -58.4200354, "curso": "1ºB", "dist": 1.32}, {"n": 301, "dir": "Av. H.Yrigoyen 11133", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7879576, "lng": -58.4082442, "curso": "1ºB", "dist": 0.457}, {"n": 302, "dir": "Isla Soledad 1832", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7747571, "lng": -58.4251988, "curso": "1ºB", "dist": 2.571}, {"n": 303, "dir": "Dr Melber 912", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8051723, "lng": -58.4186458, "curso": "1ºB", "dist": 1.908}, {"n": 304, "dir": "Sarmiento 246", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7631813, "lng": -58.4044054, "curso": "1ºB", "dist": 3.161}, {"n": 305, "dir": "25 de mayo 1458", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7859937, "lng": -58.4143164, "curso": "1ºB", "dist": 0.989}, {"n": 306, "dir": "San Mateo 1562", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.789554, "lng": -58.4118949, "curso": "1ºB", "dist": 0.593}, {"n": 307, "dir": "Polonia 548", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8066089, "lng": -58.4270445, "curso": "1ºB", "dist": 2.554}, {"n": 308, "dir": "Wilde 686", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8109216, "lng": -58.4309615, "curso": "1ºB", "dist": 3.141}, {"n": 309, "dir": "Dr. Melber 1116", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8061213, "lng": -58.4206957, "curso": "1ºB", "dist": 2.108}, {"n": 310, "dir": "G. Kurth 91", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7969409, "lng": -58.412599, "curso": "1ºB", "dist": 0.855}, {"n": 311, "dir": "Muller 258", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7863465, "lng": -58.3936262, "curso": "1ºB", "dist": 1.262}, {"n": 312, "dir": "Aragon 1801", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7827265, "lng": -58.4239037, "curso": "1ºB", "dist": 1.917}, {"n": 313, "dir": "Vicente Stea 1526", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7832794, "lng": -58.3846653, "curso": "1ºB", "dist": 2.147}, {"n": 314, "dir": "Gibson 382", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7992431, "lng": -58.4255734, "curso": "1ºB", "dist": 1.989}, {"n": 315, "dir": "Jose Hernadez 240", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8044228, "lng": -58.431397, "curso": "1ºB", "dist": 2.732}, {"n": 316, "dir": "Profesor Mariño 1861", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.789494, "lng": -58.4165344, "curso": "1ºB", "dist": 0.999}, {"n": 317, "dir": "Bahia Blanca 233", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8070313, "lng": -58.43651, "curso": "1ºB", "dist": 3.282}, {"n": 318, "dir": "Magallanes 1051", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7951967, "lng": -58.4147341, "curso": "1ºB", "dist": 0.902}, {"n": 319, "dir": "Nestor de la Peña 303", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7903342, "lng": -58.4280652, "curso": "1ºA", "dist": 2.03}, {"n": 320, "dir": "San Luis 869", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7889829, "lng": -58.4109346, "curso": "1ºA", "dist": 0.544}, {"n": 321, "dir": "San Isidro 797", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.782653, "lng": -58.4167007, "curso": "1ºA", "dist": 1.4}, {"n": 322, "dir": "San Isidro 259", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7899555, "lng": -58.410676, "curso": "1ºA", "dist": 0.473}, {"n": 323, "dir": "San Luis 980", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7896706, "lng": -58.4116818, "curso": "1ºA", "dist": 0.57}, {"n": 324, "dir": "Republica de Perú 1031", "loc": "9 de Abril", "part": "Esteban Echeverría", "lat": -34.7627925, "lng": -58.4925622, "curso": "1ºA", "dist": 8.539}, {"n": 325, "dir": "Las Heras 1495", "loc": "Banfield", "part": "Lomas de Zamora", "lat": -34.7472062, "lng": -58.4175972, "curso": "1ºA", "dist": 5.049}, {"n": 326, "dir": "Guido Spano 391", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7776181, "lng": -58.4076195, "curso": "1ºA", "dist": 1.561}, {"n": 327, "dir": "San Francisco 120", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7904222, "lng": -58.4125181, "curso": "1ºA", "dist": 0.619}, {"n": 328, "dir": "Viera 279", "loc": "Malvinas Argentinas", "part": "Esteban Echeverría", "lat": -34.8146725, "lng": -58.4166407, "curso": "1ºA", "dist": 2.749}, {"n": 329, "dir": "El Rosedal 41", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7913796, "lng": -58.4264976, "curso": "1ºA", "dist": 1.882}, {"n": 330, "dir": "El Zorzal 1916", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7697451, "lng": -58.3707058, "curso": "1ºA", "dist": 4.027}, {"n": 331, "dir": "Granaderos 955", "loc": "Longchamps", "part": "Almirante Brown", "lat": -34.8714245, "lng": -58.4063344, "curso": "1ºA", "dist": 8.878}, {"n": 332, "dir": "Jorge Newbery 956", "loc": "Luis Guillón", "part": "Esteban Echeverría", "lat": -34.8167384, "lng": -58.4484345, "curso": "1ºA", "dist": 4.787}, {"n": 333, "dir": "Gorriti 352", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.7617598, "lng": -58.4020268, "curso": "1ºA", "dist": 3.335}, {"n": 334, "dir": "Aragon 787", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7886799, "lng": -58.4190224, "curso": "1ºA", "dist": 1.242}, {"n": 335, "dir": "San Roque 61", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7887712, "lng": -58.4102995, "curso": "1ºA", "dist": 0.51}, {"n": 336, "dir": "Cuyo 1157", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8079371, "lng": -58.4208119, "curso": "1ºA", "dist": 2.273}, {"n": 337, "dir": "Guido Spano 171", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.7755578, "lng": -58.4091974, "curso": "1ºA", "dist": 1.807}, {"n": 338, "dir": "Sastre 450", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8137542, "lng": -58.4280174, "curso": "1ºA", "dist": 3.188}, {"n": 339, "dir": "Tupac Amaru 947", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8093633, "lng": -58.426457, "curso": "1ºA", "dist": 2.727}, {"n": 340, "dir": "Soler 1837", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7893589, "lng": -58.3997477, "curso": "1ºA", "dist": 0.613}, {"n": 341, "dir": "Dr. Melber 781", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8042394, "lng": -58.4175422, "curso": "1ºA", "dist": 1.765}, {"n": 342, "dir": "Comodoro Py 1735", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.8055045, "lng": -58.376563, "curso": "1ºA", "dist": 3.093}, {"n": 343, "dir": "Suipacha 410", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7909538, "lng": -58.4090168, "curso": "", "dist": 0.294}, {"n": 344, "dir": "Sto Domingo 169", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7888821, "lng": -58.4014149, "curso": "", "dist": 0.507}, {"n": 345, "dir": "Suipacha 227", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.7910601, "lng": -58.4062064, "curso": "", "dist": 0.065}, {"n": 346, "dir": "La Huella 447", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.7911537, "lng": -58.4213281, "curso": "", "dist": 1.411}, {"n": 347, "dir": "Asamblea 41", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.810507, "lng": -58.4155428, "curso": "", "dist": 2.282}, {"n": 348, "dir": "Charlone 820", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.8045705, "lng": -58.4187092, "curso": "", "dist": 1.859}, {"n": 349, "dir": "San Mateo 355", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.792016, "lng": -58.4102104, "curso": "", "dist": 0.397}, {"n": 350, "dir": "Pino 1995", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.8219806, "lng": -58.4192346, "curso": "", "dist": 3.593}];
+const JARDIN = [{"n": 0, "dir": "Gral. José Matías Zapiola 550", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79251, "lng": -58.40612, "sala_color": "COLEGIO", "sala_sec": "COLEGIO", "turno": "COLEGIO"}, {"n": 1, "dir": "Tupac Amaru 770", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80214, "lng": -58.43145, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 2.613}, {"n": 2, "dir": "Polonia 197", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80512, "lng": -58.429849999999995, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 2.656}, {"n": 3, "dir": "Luzuriaga 136", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79912, "lng": -58.424119999999995, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 1.864}, {"n": 4, "dir": "Legisladores 251", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80121, "lng": -58.42684, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 2.192}, {"n": 5, "dir": "Machado de Asís 177", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79854, "lng": -58.42312, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 1.753}, {"n": 6, "dir": "Mendoza 1205", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.81124, "lng": -58.43512, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 3.45}, {"n": 7, "dir": "Silva 945", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80415, "lng": -58.433139999999995, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 2.854}, {"n": 8, "dir": "Tunuyan 260", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.77412, "lng": -58.43915, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 3.605}, {"n": 9, "dir": "Bourquet 1412", "loc": "Luis Guillón", "part": "Esteban Echeverría", "lat": -34.81645, "lng": -58.445119999999996, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 4.525}, {"n": 10, "dir": "Pichincha 1831", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.80101, "lng": -58.41112, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 1.152}, {"n": 11, "dir": "San Mateo 888", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79451, "lng": -58.40612, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 0.326}, {"n": 12, "dir": "San Rafael 7", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79012, "lng": -58.40215, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 0.378}, {"n": 13, "dir": "Francisco Caferatta 379", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.82845, "lng": -58.40412, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 4.103}, {"n": 14, "dir": "Ceferino Namuncurá 498", "loc": "Claypole", "part": "Almirante Brown", "lat": -34.82912, "lng": -58.36145, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 5.821}, {"n": 15, "dir": "Dean Funes 768", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80154, "lng": -58.430119999999995, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 2.474}, {"n": 16, "dir": "Dr. Korge Melber", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80812, "lng": -58.429449999999996, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 2.83}, {"n": 17, "dir": "Legisladores 251", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80121, "lng": -58.42684, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 2.192}, {"n": 18, "dir": "25 de Mayo 1982", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.81451, "lng": -58.43785, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 3.875}, {"n": 19, "dir": "Agrelo 362", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79612, "lng": -58.42214, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 1.567}, {"n": 20, "dir": "Profesor Mariño 1220", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.79124, "lng": -58.40112, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 0.437}, {"n": 21, "dir": "San Mateo 888", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79451, "lng": -58.40612, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 0.326}, {"n": 22, "dir": "Av. Hipolito Yrigoyen 11133", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79185, "lng": -58.41012, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 0.387}, {"n": 23, "dir": "San Blas 596", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79412, "lng": -58.408539999999995, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 0.372}, {"n": 24, "dir": "Santo Tomas 350", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79312, "lng": -58.40712, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 0.205}, {"n": 25, "dir": "Mercedes 676", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79815, "lng": -58.42541, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 1.926}, {"n": 26, "dir": "San Isidro 925", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.79154, "lng": -58.41412, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 0.752}, {"n": 27, "dir": "1° de marzo 787", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79945, "lng": -58.43114, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 2.466}, {"n": 28, "dir": "Polonia 601", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80785, "lng": -58.43215, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 3.004}, {"n": 29, "dir": "San Mateo 1562", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79892, "lng": -58.412119999999994, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 0.995}, {"n": 30, "dir": "Pino 2467", "loc": "Malvinas Argentinas", "part": "Almirante Brown", "lat": -34.80912, "lng": -58.411139999999996, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 2.008}, {"n": 31, "dir": "San Roque 349", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.78154, "lng": -58.41245, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 1.267}, {"n": 32, "dir": "San Luis 469", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79251, "lng": -58.40415, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 0.19}, {"n": 33, "dir": "Riego Núñez 740", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79485, "lng": -58.40712, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 0.381}, {"n": 34, "dir": "Diego Gibson 2246", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.81512, "lng": -58.433139999999995, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Tarde", "dist": 3.611}, {"n": 35, "dir": "Serrano 1269", "loc": "Malvinas Argentinas", "part": "Almirante Brown", "lat": -34.80154, "lng": -58.40812, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Tarde", "dist": 1.126}, {"n": 36, "dir": "Alejo Ortega 1534", "loc": "Monte Grande", "part": "Esteban Echeverría", "lat": -34.82124, "lng": -58.46412, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Tarde", "dist": 6.256}, {"n": 37, "dir": "Juan Bautista Vago 559", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.78912, "lng": -58.40415, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Tarde", "dist": 0.316}, {"n": 38, "dir": "Enrique Policastro 294", "loc": "Adrogué", "part": "Almirante Brown", "lat": -34.79912, "lng": -58.405139999999996, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Tarde", "dist": 0.841}, {"n": 39, "dir": "Combatientes de Malvinas 1462", "loc": "Malvinas Argentinas", "part": "Almirante Brown", "lat": -34.80215, "lng": -58.40912, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.212}, {"n": 40, "dir": "Claudio León Sempere 2025", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.83412, "lng": -58.39845, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 4.779}, {"n": 41, "dir": "José Hernández 234", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79512, "lng": -58.421119999999995, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.445}, {"n": 42, "dir": "Tupac Amaru 770", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80214, "lng": -58.43145, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 2.613}, {"n": 43, "dir": "Lucio V. Mansilla 328", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79712, "lng": -58.42451, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.808}, {"n": 44, "dir": "Olleros 657", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79654, "lng": -58.42312, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.667}, {"n": 45, "dir": "Ramón Pareta 138", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79585, "lng": -58.42145, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.498}, {"n": 46, "dir": "Alberto Gómez 378", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.76812, "lng": -58.434149999999995, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 3.67}, {"n": 47, "dir": "Loria 574", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.75912, "lng": -58.41614, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 3.729}, {"n": 48, "dir": "Suipacha 41", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79054, "lng": -58.40112, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 0.451}, {"n": 49, "dir": "Aconcagua 158", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79485, "lng": -58.420449999999995, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.378}, {"n": 50, "dir": "Eva Perón 532", "loc": "Burzaco", "part": "Almirante Brown", "lat": -34.82512, "lng": -58.40114, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 3.755}, {"n": 51, "dir": "20 de Septiembre 533", "loc": "Ezeiza", "part": "Ezeiza", "lat": -34.85412, "lng": -58.53145, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 13.406}, {"n": 52, "dir": "Héroes de Malvinas 3687", "loc": "Remedios de Escalada", "part": "Lanús", "lat": -34.74124, "lng": -58.39412, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 5.7}, {"n": 53, "dir": "Pichincha 1831", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.80101, "lng": -58.41112, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 1.152}, {"n": 54, "dir": "Santa Ana 535", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79212, "lng": -58.40415, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.17}, {"n": 55, "dir": "9 de Julio 944", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79512, "lng": -58.40812, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.443}, {"n": 56, "dir": "Av. Antartida Argentina 246", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79154, "lng": -58.40412, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.162}, {"n": 57, "dir": "Suipacha 41", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79054, "lng": -58.40112, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.451}, {"n": 58, "dir": "Puig 344", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79212, "lng": -58.40585, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.06}, {"n": 59, "dir": "San Luis 213", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79112, "lng": -58.40285, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.282}, {"n": 60, "dir": "Mercedes 276", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79412, "lng": -58.42145, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 1.449}, {"n": 61, "dir": "Aconcagua 158", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79485, "lng": -58.420449999999995, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 1.378}, {"n": 62, "dir": "Daniel Enz 388", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79512, "lng": -58.422149999999995, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.536}, {"n": 63, "dir": "San Isidro 640", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.78912, "lng": -58.41112, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 0.55}, {"n": 64, "dir": "San Rafael 7", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79012, "lng": -58.40215, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 0.378}, {"n": 65, "dir": "Lavalle 1182", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.77912, "lng": -58.405449999999995, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 1.386}, {"n": 66, "dir": "Machado de Asís 130", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79785, "lng": -58.42245, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 1.665}, {"n": 67, "dir": "Agüero 321", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79212, "lng": -58.404849999999996, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.112}, {"n": 68, "dir": "Silva 1211", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80712, "lng": -58.43541, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Tarde", "dist": 3.202}, {"n": 69, "dir": "La Pampa 451", "loc": "Ezeiza", "part": "Ezeiza", "lat": -34.85124, "lng": -58.52912, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Tarde", "dist": 13.059}, {"n": 70, "dir": "Diego Gibson 277", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.79612, "lng": -58.423449999999995, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 1.681}, {"n": 71, "dir": "Profesor Mariño 1048", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79554, "lng": -58.40512, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.446}, {"n": 72, "dir": "Viena 1002", "loc": "Lomas de Zamora", "part": "Lomas de Zamora", "lat": -34.77815, "lng": -58.42912, "sala_color": "SALA AZUL", "sala_sec": "Segunda Sección", "turno": "Mañana", "dist": 2.594}, {"n": 73, "dir": "Carlos Guido Spano 171", "loc": "Temperley", "part": "Lomas de Zamora", "lat": -34.77612, "lng": -58.408139999999996, "sala_color": "SALA ROJA", "sala_sec": "Primera Sección", "turno": "Mañana", "dist": 1.731}, {"n": 74, "dir": "San Jose 229", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79012, "lng": -58.40311, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.301}, {"n": 75, "dir": "San Blas 353", "loc": "Turdera", "part": "Lomas de Zamora", "lat": -34.79251, "lng": -58.406839999999995, "sala_color": "SALA VERDE", "sala_sec": "Tercera Sección", "turno": "Mañana", "dist": 0.135}, {"n": 76, "dir": "Mendoza 1039", "loc": "Llavallol", "part": "Lomas de Zamora", "lat": -34.80912, "lng": -58.433119999999995, "sala_color": "SALA AMARILLA", "sala_sec": "Sala de 2 años", "turno": "Mañana", "dist": 3.16}];
+// ── CONSTANTS ──────────────────────────────────────────────────────
+const BASE = PRIMARIA[0];
+const PRIM_EST = PRIMARIA.slice(1);
+const JARD_EST = JARDIN.slice(1);
+const ALL_EST  = [...PRIM_EST, ...JARD_EST];
+const COLORS = ['#4f8eff','#00d4aa','#ff6b35','#a78bfa','#f59e0b','#ef4444','#10b981','#6366f1','#f97316','#06b6d4','#ec4899','#14b8a6'];
+const SALA_COLORS = {'SALA AMARILLA':'#f59e0b','SALA AZUL':'#4f8eff','SALA ROJA':'#ef4444','SALA VERDE':'#10b981','COLEGIO':'#7a8299'};
+const CURSO_COLORS = {'1ºA':'#4f8eff','1ºB':'#2563eb','2ºA':'#00d4aa','2ºB':'#059669','3ºA':'#ff6b35','3ºB':'#dc2626','4ºA':'#a78bfa','4ºB':'#7c3aed','5ºA':'#f59e0b','5ºB':'#d97706','6ºA':'#ec4899','6ºB':'#be185d','COLEGIO':'#7a8299'};
+
+function hav(lat1,lng1,lat2,lng2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Recompute dist for all from real base coords
+ALL_EST.forEach(p=>{p.dist=hav(BASE.lat,BASE.lng,p.lat,p.lng);});
+
+// ── STATE ──────────────────────────────────────────────────────────
+let nivel = 'combinado';
+let mapMode = 'both';
+let activeCurso = 'todos';
+let activeSalaColor = 'todos';
+let activeSalaSec = 'todos';
+let activeTurno = 'todos';
+let activeZona = 'todos';      // 'todos' | '2km' | '5km' | 'fuera'
+let activeLocalidad = 'todos';
+let activePartido = 'todos';
+let donutChart = null;
+
+// ── MAP SETUP ──────────────────────────────────────────────────────
+const map = L.map('map',{zoomControl:true}).setView([BASE.lat,BASE.lng],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+const st=document.createElement('style');
+st.textContent='.leaflet-tile{filter:invert(1) hue-rotate(180deg) saturate(0.5) brightness(0.75);}';
+document.head.appendChild(st);
+setTimeout(()=>map.invalidateSize(),400);
+
+// Radios
+L.circle([BASE.lat,BASE.lng],{radius:2000,color:'#00d4aa',weight:2,opacity:.85,fillColor:'#00d4aa',fillOpacity:.05}).addTo(map);
+L.circle([BASE.lat,BASE.lng],{radius:5000,color:'#ff6b35',weight:2,opacity:.7,dashArray:'8 5',fillColor:'#ff6b35',fillOpacity:.03}).addTo(map);
+
+// Base marker
+const baseIcon=L.divIcon({html:`<div style="width:16px;height:16px;background:#00d4aa;border:3px solid #fff;border-radius:50%;box-shadow:0 0 12px #00d4aa,0 0 24px rgba(0,212,170,.4)"></div>`,className:'',iconSize:[16,16],iconAnchor:[8,8]});
+L.marker([BASE.lat,BASE.lng],{icon:baseIcon,zIndexOffset:3000}).bindPopup('<div class="pu-title">📍 Base · Zapiola 550</div><div class="pu-dir">Turdera, Lomas de Zamora</div>').addTo(map);
+
+// Pane for dots above heat
+map.createPane('dotsPane');
+map.getPane('dotsPane').style.zIndex=650;
+map.getPane('dotsPane').style.pointerEvents='auto';
+
+let heatLayer=null, dotGroup=null;
+
+function colorForDot(p){
+  if(p.dist>5) return '#00aaff';
+  if(nivel==='primaria') return CURSO_COLORS[p.curso]||'#4f8eff';
+  if(nivel==='jardin')   return SALA_COLORS[p.sala_color]||'#00d4aa';
+  // combinado
+  if(p.curso!==undefined) return '#4f8eff'; // primaria
+  return '#00d4aa'; // jardin
+}
+
+function makePopup(p){
+  const zona=p.dist<=2?'🟢 ≤ 2 km':p.dist<=5?'🟠 ≤ 5 km':'🔵 Fuera de radios';
+  const nivel_badge=p.curso!==undefined?`<span class="pu-badge pu-prim">PRIMARIA ${p.curso||''}</span>`:`<span class="pu-badge pu-jard">JARDÍN · ${p.sala_color||''}</span>`;
+  const extra=p.curso!==undefined
+    ?`<div class="pu-row"><span>Curso</span><span>${p.curso}</span></div>`
+    :`<div class="pu-row"><span>Sala</span><span>${p.sala_color} · ${p.sala_sec}</span></div>
+      <div class="pu-row"><span>Turno</span><span>${p.turno}</span></div>`;
+  return `${nivel_badge}<div class="pu-title" style="margin-top:5px">${p.loc}</div>
+<div class="pu-dir">${p.dir}</div>
+<div class="pu-row"><span>Partido</span><span>${p.part}</span></div>
+${extra}
+<div class="pu-row"><span>Dist.</span><span>${p.dist.toFixed(2)} km · ${zona}</span></div>`;
+}
+
+function getActivePoints(){
+  let pts;
+  if(nivel==='combinado') pts=ALL_EST;
+  else if(nivel==='primaria') pts=PRIM_EST;
+  else pts=JARD_EST;
+
+  // nivel-specific filters
+  if(nivel==='primaria' && activeCurso!=='todos') pts=pts.filter(p=>p.curso===activeCurso);
+  if(nivel==='jardin'){
+    if(activeSalaColor!=='todos') pts=pts.filter(p=>p.sala_color===activeSalaColor);
+    if(activeSalaSec!=='todos')   pts=pts.filter(p=>p.sala_sec===activeSalaSec);
+    if(activeTurno!=='todos')     pts=pts.filter(p=>p.turno===activeTurno);
+  }
+
+  // geographic filters (apply to all modes)
+  if(activeZona==='2km')   pts=pts.filter(p=>p.dist<=2);
+  if(activeZona==='5km')   pts=pts.filter(p=>p.dist>2 && p.dist<=5);
+  if(activeZona==='fuera') pts=pts.filter(p=>p.dist>5);
+  if(activeLocalidad!=='todos') pts=pts.filter(p=>p.loc.trim()===activeLocalidad);
+  if(activePartido!=='todos')   pts=pts.filter(p=>p.part.trim()===activePartido);
+
+  return pts;
+}
+
+function redrawMap(){
+  if(heatLayer){try{map.removeLayer(heatLayer);}catch(e){}}
+  if(dotGroup){try{map.removeLayer(dotGroup);}catch(e){}}
+
+  const pts = getActivePoints();
+
+  // Dynamic heat params — scale aggressively for small filtered sets
+  const n=pts.length;
+  const heatRadius = n<=5?50:n<=15?42:n<=30?35:n<=60?28:20;
+  const heatBlur   = n<=5?35:n<=15?28:n<=30?24:n<=60?20:15;
+  const heatMax    = n<=5?0.4:n<=15?0.5:n<=30?0.6:n<=60?0.7:1.0;
+  const heatMinOp  = n<=5?0.8:n<=15?0.7:n<=30?0.6:0.5;
+  heatLayer=L.heatLayer(pts.map(p=>[p.lat,p.lng,1.0]),{
+    radius:heatRadius, blur:heatBlur, maxZoom:17, max:heatMax, minOpacity:heatMinOp,
+    gradient:{0:'#000033',0.3:'#003366',0.55:'#0066cc',0.75:'#00ccff',0.9:'#ffcc00',1:'#ff2200'}
+  });
+
+  const markers=pts.map(p=>{
+    const outside=p.dist>5;
+    const m=L.circleMarker([p.lat,p.lng],{
+      pane:'dotsPane',
+      radius:outside?7:5,
+      fillColor:colorForDot(p),
+      color:'rgba(255,255,255,0.6)',
+      weight:outside?1.5:0.8,
+      fillOpacity:1,
+      opacity:1
+    });
+    m.bindPopup(makePopup(p));
+    return m;
+  });
+  dotGroup=L.layerGroup(markers);
+
+  if(mapMode==='heat'){map.addLayer(heatLayer);}
+  else if(mapMode==='dots'){map.addLayer(dotGroup);}
+  else if(mapMode==='both'){map.addLayer(heatLayer);map.addLayer(dotGroup);}
+
+  updateLegend(pts);
+}
+
+function li(color, label, style='fill'){
+  const dot = style==='fill'
+    ? `<div class="ld" style="background:${color}"></div>`
+    : style==='ring'
+    ? `<div class="ld" style="border:2px solid ${color};background:transparent"></div>`
+    : `<div class="ld" style="border:2px dashed ${color};background:transparent"></div>`;
+  return `<div class="li">${dot}${label}</div>`;
+}
+
+function updateLegend(pts){
+  const leg = document.getElementById('mapLegend');
+  let items = '';
+
+  // Always: base marker + radios
+  items += li('#00d4aa','Base','fill');
+  items += li('#00d4aa','2 km','ring');
+  items += li('#ff6b35','5 km','dash');
+
+  // Point colors depend on nivel
+  if(nivel==='combinado'){
+    const hasPrim = pts.some(p=>p.curso!==undefined);
+    const hasJard = pts.some(p=>p.sala_color!==undefined);
+    if(hasPrim) items += li('#4f8eff','Primaria');
+    if(hasJard) items += li('#00d4aa','Jardín');
+
+  } else if(nivel==='primaria'){
+    if(activeCurso==='todos'){
+      // Show each curso present in filtered pts
+      const cursos=[...new Set(pts.map(p=>p.curso).filter(Boolean))].sort();
+      cursos.forEach(c => items += li(CURSO_COLORS[c]||'#4f8eff', c));
+    } else {
+      items += li(CURSO_COLORS[activeCurso]||'#4f8eff', activeCurso);
+    }
+
+  } else if(nivel==='jardin'){
+    if(activeSalaColor==='todos'){
+      const salas=[...new Set(pts.map(p=>p.sala_color).filter(Boolean))].sort();
+      salas.forEach(s => items += li(SALA_COLORS[s]||'#00d4aa', s.replace('SALA ','')));
+    } else {
+      items += li(SALA_COLORS[activeSalaColor]||'#00d4aa', activeSalaColor.replace('SALA ',''));
+    }
+  }
+
+  // Outside-radius points (always blue electric if any)
+  const hasOutside = pts.some(p=>p.dist>5);
+  if(hasOutside) items += li('#00aaff','Fuera 5 km');
+
+  // Show count if filtered
+  const total = nivel==='combinado'?ALL_EST.length:nivel==='primaria'?PRIM_EST.length:JARD_EST.length;
+  if(pts.length < total){
+    items += `<div class="li" style="margin-left:auto;color:var(--ac4);font-weight:600">${pts.length} de ${total}</div>`;
+  }
+
+  leg.innerHTML = items;
+}
+
+function setMapMode(mode,btn){
+  mapMode=mode;
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  redrawMap();
+}
+
+// ── FILTERS ────────────────────────────────────────────────────────
+function buildFilters(){
+  const fb=document.getElementById('filterBar');
+  fb.innerHTML='';
+
+  if(nivel==='combinado'){
+    // no level-specific filters, but geo filters still apply below
+  }
+
+  if(nivel==='primaria'){
+    const cursos=[...new Set(PRIM_EST.map(p=>p.curso).filter(Boolean))].sort();
+    fb.innerHTML=`<label>CURSO:</label>`;
+    const all=document.createElement('button');
+    all.className='f-chip on'; all.textContent='Todos';
+    all.style.cssText='background:rgba(79,142,255,.2);color:#4f8eff;border-color:#4f8eff;';
+    all.onclick=()=>{activeCurso='todos';buildFilters();update();};
+    fb.appendChild(all);
+    cursos.forEach(c=>{
+      const btn=document.createElement('button');
+      const col=CURSO_COLORS[c]||'#4f8eff';
+      btn.className='f-chip '+(activeCurso===c?'on':'off');
+      btn.textContent=c;
+      btn.style.cssText=`background:${col}22;color:${col};border-color:${col};`;
+      btn.onclick=()=>{activeCurso=c;buildFilters();update();};
+      fb.appendChild(btn);
+    });
+  }
+
+  if(nivel==='jardin'){
+    // Sala color
+    const salasColor=[...new Set(JARD_EST.map(p=>p.sala_color).filter(Boolean))].sort();
+    const fb2=document.createElement('div');
+    fb2.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+    fb2.innerHTML='<label style="font-size:.72rem;color:var(--mt);text-transform:uppercase;letter-spacing:.05em">SALA COLOR:</label>';
+    const allSC=document.createElement('button');
+    allSC.className='f-chip on'; allSC.textContent='Todas';
+    allSC.style.cssText='background:rgba(0,212,170,.2);color:#00d4aa;border-color:#00d4aa;';
+    allSC.onclick=()=>{activeSalaColor='todos';buildFilters();update();};
+    fb2.appendChild(allSC);
+    salasColor.forEach(s=>{
+      const col=SALA_COLORS[s]||'#7a8299';
+      const btn=document.createElement('button');
+      btn.className='f-chip '+(activeSalaColor===s?'on':'off');
+      btn.textContent=s.replace('SALA ','');
+      btn.style.cssText=`background:${col}22;color:${col};border-color:${col};`;
+      btn.onclick=()=>{activeSalaColor=s;buildFilters();update();};
+      fb2.appendChild(btn);
+    });
+    fb.appendChild(fb2);
+
+    // Turno
+    const sep=document.createElement('span');
+    sep.style.cssText='color:var(--br);font-size:1.2rem;padding:0 4px;';
+    sep.textContent='|';
+    fb.appendChild(sep);
+
+    const fb3=document.createElement('div');
+    fb3.style.cssText='display:flex;gap:8px;align-items:center;';
+    fb3.innerHTML='<label style="font-size:.72rem;color:var(--mt);text-transform:uppercase;letter-spacing:.05em">TURNO:</label>';
+    ['todos','Mañana','Tarde'].forEach(t=>{
+      const btn=document.createElement('button');
+      btn.className='f-chip '+(activeTurno===t?'on':'off');
+      btn.textContent=t==='todos'?'Todos':t;
+      btn.style.cssText='background:rgba(167,139,250,.15);color:#a78bfa;border-color:#a78bfa;';
+      btn.onclick=()=>{activeTurno=t;buildFilters();update();};
+      fb3.appendChild(btn);
+    });
+    fb.appendChild(fb3);
+  }
+
+  // ── GEOGRAPHIC FILTERS (always shown) ──────────────────────────
+  addGeoFilters(fb);
+}
+
+function mkLabel(txt){
+  const l=document.createElement('label');
+  l.style.cssText='font-size:.72rem;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;';
+  l.textContent=txt; return l;
+}
+function mkSep(){
+  const s=document.createElement('span');
+  s.style.cssText='color:var(--br);padding:0 4px;font-size:1rem;';
+  s.textContent='|'; return s;
+}
+
+function addGeoFilters(fb){
+  const div=document.createElement('div');
+  div.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--br);padding-top:8px;margin-top:4px;width:100%;';
+
+  // ── RADIO chips ──────────────────────────────────────────────
+  div.appendChild(mkLabel('RADIO:'));
+  [{v:'todos',l:'Todos',c:'#7a8299'},{v:'2km',l:'≤ 2 km',c:'#00d4aa'},{v:'5km',l:'2–5 km',c:'#ff6b35'},{v:'fuera',l:'Fuera 5km',c:'#00aaff'}]
+    .forEach(({v,l,c})=>{
+      const btn=document.createElement('button');
+      btn.className='f-chip '+(activeZona===v?'on':'off');
+      btn.textContent=l;
+      btn.style.cssText=`background:${c}22;color:${c};border-color:${c};`;
+      btn.onclick=()=>{activeZona=v;buildFilters();update();};
+      div.appendChild(btn);
+    });
+
+  div.appendChild(mkSep());
+
+  // ── LOCALIDAD select ─────────────────────────────────────────
+  div.appendChild(mkLabel('LOCALIDAD:'));
+  const basePts=nivel==='combinado'?ALL_EST:nivel==='primaria'?PRIM_EST:JARD_EST;
+  const locs=[...new Set(basePts.map(p=>p.loc.trim()))].sort();
+  const selL=document.createElement('select');
+  selL.className='filter-select';
+  const optL0=document.createElement('option');
+  optL0.value='todos'; optL0.textContent='Todas';
+  selL.appendChild(optL0);
+  locs.forEach(l=>{
+    const o=document.createElement('option');
+    o.value=l; o.textContent=l;
+    if(activeLocalidad===l) o.selected=true;
+    selL.appendChild(o);
+  });
+  selL.onchange=e=>{activeLocalidad=e.target.value;buildFilters();update();};
+  div.appendChild(selL);
+
+  div.appendChild(mkSep());
+
+  // ── PARTIDO select ───────────────────────────────────────────
+  div.appendChild(mkLabel('PARTIDO:'));
+  const parts=[...new Set(basePts.map(p=>p.part.trim()))].sort();
+  const selP=document.createElement('select');
+  selP.className='filter-select';
+  const optP0=document.createElement('option');
+  optP0.value='todos'; optP0.textContent='Todos';
+  selP.appendChild(optP0);
+  parts.forEach(p=>{
+    const o=document.createElement('option');
+    o.value=p; o.textContent=p;
+    if(activePartido===p) o.selected=true;
+    selP.appendChild(o);
+  });
+  selP.onchange=e=>{activePartido=e.target.value;buildFilters();update();};
+  div.appendChild(selP);
+
+  // ── RESET button ─────────────────────────────────────────────
+  div.appendChild(mkSep());
+  const reset=document.createElement('button');
+  reset.style.cssText='padding:4px 10px;border-radius:6px;border:1px solid var(--br);background:transparent;color:var(--mt);font-size:.7rem;cursor:pointer;';
+  reset.textContent='✕ Limpiar';
+  reset.onclick=()=>{activeZona='todos';activeLocalidad='todos';activePartido='todos';buildFilters();update();};
+  div.appendChild(reset);
+
+  fb.appendChild(div);
+}
+
+// ── LEVEL SWITCHER ─────────────────────────────────────────────────
+function setNivel(n){
+  nivel=n;
+  activeCurso='todos'; activeSalaColor='todos'; activeSalaSec='todos'; activeTurno='todos';
+  activeZona='todos'; activeLocalidad='todos'; activePartido='todos';
+  document.getElementById('btn-comb').className='mode-btn'+(n==='combinado'?' active-comb':'');
+  document.getElementById('btn-prim').className='mode-btn'+(n==='primaria'?' active-prim':'');
+  document.getElementById('btn-jard').className='mode-btn'+(n==='jardin'?' active-jard':'');
+  document.getElementById('mapTitle').textContent=
+    n==='combinado'?'🗺 Mapa Combinado':n==='primaria'?'📘 Primaria':' 🌱 Jardín';
+  buildFilters();
+  update();
+}
+
+// ── STATS & CHARTS ─────────────────────────────────────────────────
+function locStats(pts){
+  const m={};
+  pts.forEach(p=>{
+    const k=p.loc.trim();
+    if(!m[k]) m[k]={loc:k,part:p.part,cnt:0,dsum:0};
+    m[k].cnt++; m[k].dsum+=p.dist;
+  });
+  return Object.values(m).sort((a,b)=>b.cnt-a.cnt).map(v=>({...v,avgDist:v.dsum/v.cnt}));
+}
+
+function partStats(pts){
+  const m={};
+  pts.forEach(p=>{
+    const k=p.part.trim();
+    if(!m[k]) m[k]={part:k,cnt:0};
+    m[k].cnt++;
+  });
+  return Object.values(m).sort((a,b)=>b.cnt-a.cnt);
+}
+
+function update(){
+  const pts=getActivePoints();
+  const total=pts.length;
+  const in2=pts.filter(p=>p.dist<=2).length;
+  const in5=pts.filter(p=>p.dist<=5).length;
+  const locs=locStats(pts);
+
+  // KPIs
+  const levelLabel=nivel==='combinado'?'Jardín + Primaria':nivel==='primaria'?'Primaria':'Jardín';
+  document.getElementById('k-total').textContent=total;
+  document.getElementById('k-total-s').textContent=levelLabel;
+  document.getElementById('k-2km').textContent=in2;
+  document.getElementById('k-2km-s').textContent=((in2/total)*100).toFixed(1)+'% del total';
+  document.getElementById('k-5km').textContent=in5;
+  document.getElementById('k-5km-s').textContent=((in5/total)*100).toFixed(1)+'% del total';
+  if(locs[0]){
+    document.getElementById('k-loc1').textContent=locs[0].cnt;
+    document.getElementById('k-loc1-s').textContent=locs[0].loc+' · '+((locs[0].cnt/total)*100).toFixed(1)+'%';
+  }
+
+  // Ranking
+  const maxC=locs[0]?.cnt||1;
+  const rl=document.getElementById('rankList');
+  rl.innerHTML='';
+  locs.slice(0,10).forEach((l,i)=>{
+    rl.innerHTML+=`<div class="ri">
+      <div class="rn">#${i+1}</div>
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:.77rem;margin-bottom:2px">
+          <span style="font-weight:500">${l.loc}</span>
+          <span style="color:var(--mt);font-size:.65rem">${l.part}</span>
+        </div>
+        <div class="rb"><div class="rbf" style="width:${(l.cnt/maxC*100).toFixed(1)}%;background:${COLORS[i]}"></div></div>
+      </div>
+      <div class="rcount" style="color:${COLORS[i]}">${l.cnt}</div>
+    </div>`;
+  });
+
+  // Donut
+  const top5=locs.slice(0,5);
+  const otros=locs.slice(5).reduce((s,l)=>s+l.cnt,0);
+  if(donutChart) donutChart.destroy();
+  donutChart=new Chart(document.getElementById('donut'),{
+    type:'doughnut',
+    data:{
+      labels:[...top5.map(l=>l.loc),'Resto'],
+      datasets:[{
+        data:[...top5.map(l=>l.cnt),otros],
+        backgroundColor:[...COLORS.slice(0,5),'#3a3f52'],
+        borderColor:'#151820',borderWidth:2,hoverOffset:5
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:'65%',
+      plugins:{
+        legend:{position:'right',labels:{color:'#7a8299',font:{size:10},boxWidth:9,padding:6}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.parsed} (${((ctx.parsed/total)*100).toFixed(1)}%)`}}
+      }
+    }
+  });
+
+  // Radio table — sorted by avg dist
+  const tbl=document.getElementById('radioTbl');
+  tbl.innerHTML='';
+  [...locs].sort((a,b)=>a.avgDist-b.avgDist).forEach(l=>{
+    const badge=l.avgDist<=2?'<span class="b2">≤ 2km</span>':l.avgDist<=5?'<span class="b5">≤ 5km</span>':'<span class="bf">Fuera</span>';
+    tbl.innerHTML+=`<tr><td>${l.loc}</td><td style="color:var(--mt)">${l.avgDist.toFixed(1)} km</td><td style="font-weight:600">${l.cnt}</td><td>${badge}</td></tr>`;
+  });
+
+  // Partido bars
+  const parts=partStats(pts);
+  const maxP=parts[0]?.cnt||1;
+  const pg=document.getElementById('partGrid');
+  pg.innerHTML='';
+  parts.forEach((p,i)=>{
+    pg.innerHTML+=`<div>
+      <div class="prow"><span style="font-weight:500">${p.part}</span><span style="color:var(--mt);font-size:.73rem">${p.cnt} · ${((p.cnt/total)*100).toFixed(1)}%</span></div>
+      <div class="pbar"><div class="pbf" style="width:${(p.cnt/maxP*100).toFixed(1)}%;background:${COLORS[i]||'#7a8299'}"></div></div>
+    </div>`;
+  });
+
+  redrawMap();
+}
+
+// ── INFORME IMPRIMIBLE ────────────────────────────────────────────
+function generarInforme(){
+  const pts = getActivePoints();
+  const total = pts.length;
+  if(total===0){alert('No hay estudiantes con los filtros seleccionados.');return;}
+
+  const in2  = pts.filter(p=>p.dist<=2);
+  const in5  = pts.filter(p=>p.dist>2&&p.dist<=5);
+  const fuera= pts.filter(p=>p.dist>5);
+
+  // Localidad stats
+  const locMap={};
+  pts.forEach(p=>{
+    const k=p.loc.trim();
+    if(!locMap[k]) locMap[k]={loc:k,part:p.part,cnt:0,pts:[]};
+    locMap[k].cnt++; locMap[k].pts.push(p);
+  });
+  const locArr=Object.values(locMap).sort((a,b)=>b.cnt-a.cnt);
+
+  // Partido stats
+  const partMap={};
+  pts.forEach(p=>{
+    const k=p.part.trim();
+    if(!partMap[k]) partMap[k]={part:k,cnt:0};
+    partMap[k].cnt++;
+  });
+  const partArr=Object.values(partMap).sort((a,b)=>b.cnt-a.cnt);
+
+  // Build filter description
+  const levelLabel=nivel==='combinado'?'Combinado (Jardín + Primaria)':nivel==='primaria'?'Primaria':'Jardín';
+  const filtros=[];
+  if(nivel==='primaria'&&activeCurso!=='todos') filtros.push('Curso: '+activeCurso);
+  if(nivel==='jardin'&&activeSalaColor!=='todos') filtros.push('Sala: '+activeSalaColor);
+  if(nivel==='jardin'&&activeTurno!=='todos') filtros.push('Turno: '+activeTurno);
+  if(activeZona!=='todos') filtros.push('Radio: '+(activeZona==='2km'?'≤ 2 km':activeZona==='5km'?'2–5 km':'Fuera de 5 km'));
+  if(activeLocalidad!=='todos') filtros.push('Localidad: '+activeLocalidad);
+  if(activePartido!=='todos') filtros.push('Partido: '+activePartido);
+  const filtroStr = filtros.length ? filtros.join(' · ') : 'Sin filtros adicionales';
+
+  // Donut chart data for pie SVG
+  const top5=locArr.slice(0,5);
+  const otrosCnt=locArr.slice(5).reduce((s,l)=>s+l.cnt,0);
+  const pieData=[...top5.map(l=>({label:l.loc,cnt:l.cnt}))];
+  if(otrosCnt>0) pieData.push({label:'Resto',cnt:otrosCnt});
+  const PIE_COLORS=['#4f8eff','#00d4aa','#ff6b35','#a78bfa','#f59e0b','#7a8299'];
+
+  function buildPieSVG(data, total){
+    let svg='<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">';
+    let startAngle=-Math.PI/2;
+    data.forEach((d,i)=>{
+      const angle=(d.cnt/total)*2*Math.PI;
+      const endAngle=startAngle+angle;
+      const x1=100+90*Math.cos(startAngle), y1=100+90*Math.sin(startAngle);
+      const x2=100+90*Math.cos(endAngle),   y2=100+90*Math.sin(endAngle);
+      const large=angle>Math.PI?1:0;
+      svg+=`<path d="M100,100 L${x1.toFixed(1)},${y1.toFixed(1)} A90,90 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${PIE_COLORS[i]}" stroke="#fff" stroke-width="1.5"/>`;
+      startAngle=endAngle;
+    });
+    svg+='<circle cx="100" cy="100" r="40" fill="white"/>';
+    svg+=`<text x="100" y="96" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">${total}</text>`;
+    svg+=`<text x="100" y="112" text-anchor="middle" font-size="9" fill="#666">estudiantes</text>`;
+    svg+='</svg>';
+    return svg;
+  }
+
+  function buildLegend(data){
+    return data.map((d,i)=>`
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;">
+        <div style="width:12px;height:12px;border-radius:3px;background:${PIE_COLORS[i]};flex-shrink:0"></div>
+        <span>${d.label}</span>
+        <span style="margin-left:auto;font-weight:600;color:#333">${d.cnt} (${((d.cnt/total)*100).toFixed(1)}%)</span>
+      </div>`).join('');
+  }
+
+  // Group pts by zona for the student table
+  function buildZonaTable(pts_z, zonaLabel, color){
+    if(pts_z.length===0) return '';
+    const byLoc={};
+    pts_z.forEach(p=>{
+      const k=p.loc.trim();
+      if(!byLoc[k]) byLoc[k]=[];
+      byLoc[k].push(p);
+    });
+    let rows='';
+    Object.entries(byLoc).sort((a,b)=>b[1].length-a[1].length).forEach(([loc,arr])=>{
+      rows+=`<tr>
+        <td style="padding:5px 8px;border-bottom:1px solid #eee;">${loc}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #eee;color:#666;">${arr[0].part}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center;font-weight:600;">${arr.length}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center;color:#666;">${((arr.length/total)*100).toFixed(1)}%</td>
+      </tr>`;
+    });
+    return `
+      <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+        <div style="width:12px;height:12px;border-radius:50%;background:${color}"></div>
+        <strong style="font-size:13px;color:#333">${zonaLabel}</strong>
+        <span style="font-size:12px;color:#666">${pts_z.length} estudiantes · ${((pts_z.length/total)*100).toFixed(1)}%</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;">
+        <thead><tr style="background:#f5f5f5;">
+          <th style="padding:5px 8px;text-align:left;font-size:11px;color:#666;font-weight:600;text-transform:uppercase;">Localidad</th>
+          <th style="padding:5px 8px;text-align:left;font-size:11px;color:#666;font-weight:600;text-transform:uppercase;">Partido</th>
+          <th style="padding:5px 8px;text-align:center;font-size:11px;color:#666;font-weight:600;text-transform:uppercase;">N°</th>
+          <th style="padding:5px 8px;text-align:center;font-size:11px;color:#666;font-weight:600;text-transform:uppercase;">%</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  const now=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
+
+  const html=`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe IVP · ${now}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#222;background:#fff;padding:32px 40px;}
+  @media print{body{padding:16px 20px;} .no-print{display:none;} @page{margin:1.5cm;}}
+  h1{font-size:20px;color:#1a1a2e;margin-bottom:2px;}
+  .subtitle{font-size:12px;color:#666;margin-bottom:6px;}
+  .meta{font-size:11px;color:#999;margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid #1a1a2e;}
+  .filtro-tag{display:inline-block;background:#f0f0ff;border:1px solid #c0c0e0;border-radius:4px;padding:2px 8px;font-size:11px;color:#444;margin:2px 3px 2px 0;}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+  .kpi{border:1px solid #e0e0e0;border-radius:8px;padding:14px 16px;position:relative;overflow:hidden;}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0;}
+  .kpi.k1::before{background:linear-gradient(90deg,#a78bfa,#7c3aed);}
+  .kpi.k2::before{background:linear-gradient(90deg,#00d4aa,#059669);}
+  .kpi.k3::before{background:linear-gradient(90deg,#ff6b35,#dc2626);}
+  .kpi.k4::before{background:linear-gradient(90deg,#00aaff,#2563eb);}
+  .kpi-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;}
+  .kpi-value{font-size:28px;font-weight:700;margin:3px 0 1px;line-height:1;color:#1a1a2e;}
+  .kpi-sub{font-size:11px;color:#888;}
+  h2{font-size:14px;color:#1a1a2e;margin:20px 0 10px;padding-bottom:5px;border-bottom:1px solid #e5e5e5;text-transform:uppercase;letter-spacing:.04em;}
+  .two-col{display:grid;grid-template-columns:180px 1fr;gap:20px;align-items:start;margin-bottom:20px;}
+  .pie-legend{padding-top:8px;}
+  .rank-bar-wrap{height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden;margin-top:3px;}
+  .rank-bar{height:100%;border-radius:3px;}
+  .rank-row{display:grid;grid-template-columns:16px 1fr 36px;gap:8px;align-items:center;margin-bottom:8px;font-size:12px;}
+  .rank-n{color:#aaa;font-size:10px;text-align:right;}
+  .rank-name{font-weight:500;}
+  .rank-part{font-size:10px;color:#aaa;}
+  .rank-cnt{font-weight:700;text-align:right;}
+  .partido-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;}
+  .partido-bar{height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden;margin-bottom:8px;}
+  .partido-fill{height:100%;border-radius:3px;}
+  .footer{margin-top:32px;padding-top:12px;border-top:1px solid #e0e0e0;font-size:10px;color:#aaa;display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<h1>Área de Ubicación de Estudiantes · IVP</h1>
+<div class="subtitle">Nivel: <strong>${levelLabel}</strong></div>
+<div class="meta">
+  <span style="margin-right:10px;">Fecha: <strong>${now}</strong></span>
+  <span style="margin-right:10px;">Filtros activos:</span>
+  ${filtros.length ? filtros.map(f=>`<span class="filtro-tag">${f}</span>`).join('') : '<span class="filtro-tag">Ninguno</span>'}
+</div>
+
+<div class="kpi-row">
+  <div class="kpi k1">
+    <div class="kpi-label">Total estudiantes</div>
+    <div class="kpi-value">${total}</div>
+    <div class="kpi-sub">${levelLabel}</div>
+  </div>
+  <div class="kpi k2">
+    <div class="kpi-label">En radio ≤ 2 km</div>
+    <div class="kpi-value">${in2.length}</div>
+    <div class="kpi-sub">${((in2.length/total)*100).toFixed(1)}% del total</div>
+  </div>
+  <div class="kpi k3">
+    <div class="kpi-label">Entre 2 y 5 km</div>
+    <div class="kpi-value">${in5.length}</div>
+    <div class="kpi-sub">${((in5.length/total)*100).toFixed(1)}% del total</div>
+  </div>
+  <div class="kpi k4">
+    <div class="kpi-label">Fuera de 5 km</div>
+    <div class="kpi-value">${fuera.length}</div>
+    <div class="kpi-sub">${((fuera.length/total)*100).toFixed(1)}% del total</div>
+  </div>
+</div>
+
+<h2>Distribución por Localidad</h2>
+<div class="two-col">
+  <div>${buildPieSVG(pieData,total)}</div>
+  <div>
+    <div class="pie-legend">${buildLegend(pieData)}</div>
+    <div style="margin-top:16px;">
+      ${locArr.slice(0,10).map((l,i)=>`
+        <div class="rank-row">
+          <div class="rank-n">#${i+1}</div>
+          <div>
+            <div style="display:flex;justify-content:space-between;">
+              <span class="rank-name">${l.loc}</span>
+              <span class="rank-part">${l.part}</span>
+            </div>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(l.cnt/locArr[0].cnt*100).toFixed(1)}%;background:${PIE_COLORS[i]||'#ccc'}"></div></div>
+          </div>
+          <div class="rank-cnt" style="color:${PIE_COLORS[i]||'#333'}">${l.cnt}</div>
+        </div>`).join('')}
+    </div>
+  </div>
+</div>
+
+<h2>Distribución por Partido</h2>
+<div style="max-width:480px;margin-bottom:20px;">
+  ${partArr.map((p,i)=>`
+    <div class="partido-row">
+      <span style="font-weight:500">${p.part}</span>
+      <span style="color:#888">${p.cnt} · ${((p.cnt/total)*100).toFixed(1)}%</span>
+    </div>
+    <div class="partido-bar"><div class="partido-fill" style="width:${(p.cnt/partArr[0].cnt*100).toFixed(1)}%;background:${PIE_COLORS[i]||'#ccc'}"></div></div>
+  `).join('')}
+</div>
+
+<h2>Detalle por Radio de Distancia</h2>
+${buildZonaTable(in2,'Dentro de 2 km','#00d4aa')}
+${buildZonaTable(in5,'Entre 2 y 5 km','#ff6b35')}
+${buildZonaTable(fuera,'Fuera de 5 km','#00aaff')}
+
+<div class="footer">
+  <span>Instituto IVP · Zapiola 550, Turdera, Lomas de Zamora</span>
+  <span>Generado el ${now}</span>
+</div>
+</body></html>`;
+
+  document.getElementById('reportContent').innerHTML = html;
+  document.getElementById('reportModal').classList.add('open');
+  document.getElementById('reportModal').scrollTop = 0;
+}
+
+function cerrarInforme(){
+  document.getElementById('reportModal').classList.remove('open');
+  document.getElementById('reportContent').innerHTML='';
+}
+
+// ── INIT ───────────────────────────────────────────────────────────
+setNivel('combinado');
+</script>
+</body>
+</html>
